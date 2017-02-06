@@ -161,17 +161,19 @@ def ValidFileName(filename):
     filename = filename.replace(u'|', u'｜')
     filename = filename.replace(u'?', u'？')
     filename = filename.replace(u'"', u'＂')
-    print filename.encode('GB18030')
+#    print filename.encode('GB18030')
     return filename
 
 
 def SaveToFile(full_path, data, overwrite = False):
     if not overwrite:
         if os.path.exists(full_path):
-#            return
             print (u'已存在文件 ' + full_path + u', 跳过').encode('GB18030')
-    with open(full_path, 'wb') as o:
-        o.write(data)
+    try:
+        with open(full_path, 'wb') as o:
+            o.write(data)
+    except:
+        print u'保存出错.'
 
 
 def HandleManga(title, mag_url):
@@ -195,10 +197,7 @@ def HandleImage(title, img_url, overwrite = False):
     ori_url = ori_url.replace(old_last, new_last)
 
     title = (last1[0] + '_' + last1[1] + '_').decode('utf-8') + title + ('.' + last2[1]).decode('utf-8')
-#    print "[Debug] final url: %s" %(ori_url)
 
-    print FileSaveDirectory
-    print ValidFileName(title).encode('gb18030')
     full_path = FileSaveDirectory + ValidFileName(title)
     if IsFileExists(full_path):
         print (u'已存在文件 ' + full_path + u', 跳过').encode('GB18030')
@@ -245,19 +244,16 @@ def ParsePage(opener, url):
 
         tmp = re.findall("<title>「(.*?)」.*?</title>", html, re.S)
         title = tmp[0].decode("utf-8")
-#        print title
 
         manga = re.findall('<div class="works_display"><a href="', html, re.S)
         if manga:
             # 漫画模式
-#            print '[Debug] manga mode'
             HandleManga(title, url.replace("medium", "manga"))
 
         else:
             zip = re.findall('"src":"(.*?)"', html, re.S)
             if zip:
                 # gif动画模式
-#                print '[Debug] gif mode'
                 # 这里的zip包链接需要去除转义的反斜杠
                 for i in range(len(zip)):
                     zip_url = zip[i].replace('\\', '')
@@ -265,7 +261,6 @@ def ParsePage(opener, url):
 
             else:
                 # 普通模式
-#                print '[Debug] single picture mode'
                 img_url = re.findall('<div class="works_display"><.*?><img src="(.*?)"', html, re.S)
                 if len(img_url) > 1:
                     print "[Debug] multi image url in normal mode. (%s)" %(url)
