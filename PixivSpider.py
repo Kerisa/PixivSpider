@@ -292,7 +292,7 @@ def GetIllustationListViaPixivId(opener, pid):
     try:
         response = opener.open(page_url)
         html = Gzip(response.read())
-        tmp = re.findall('<li class="image-item"><a href="/(.*?)"', html, re.S)
+        tmp = re.findall('<li class="image-item.?"><a href="/(.*?)"', html, re.S)
         for item in tmp:
             img_list.append(MainPage + item.replace("amp;", ""))
 
@@ -312,7 +312,7 @@ def GetIllustationListViaPixivId(opener, pid):
         try:
             response = opener.open(page_url)
             html = Gzip(response.read())
-            tmp = re.findall('<li class="image-item"><a href="/(.*?)"', html, re.S)      # MainPage带有一个正斜杠, 这里少配一个
+            tmp = re.findall('<li class="image-item.?"><a href="/(.*?)"', html, re.S)      # MainPage带有一个正斜杠, 这里少配一个
             for item in tmp:
                 img_list.append(MainPage + item.replace("amp;", ""))
 
