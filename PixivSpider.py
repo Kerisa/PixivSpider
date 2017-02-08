@@ -226,14 +226,13 @@ def HandleGif(title, zip_url):
     tmp = zip_url.split('/')[-1].split(".")[0]
     name = tmp + title + '.zip'
 
-    full_path = FileSaveDirectory + ValidFileName(title)
+    full_path = FileSaveDirectory + ValidFileName(name)
     if IsFileExists(full_path):
         print (u'已存在文件 ' + full_path + u', 跳过').encode('GB18030')
         return
 
     ii = opener.open(zip_url)
-    with open(name, 'wb') as o:
-        o.write(ii.read())
+    SaveToFile(full_path, ii.read())
 
 
 def ParsePage(opener, url):
