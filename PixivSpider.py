@@ -119,6 +119,15 @@ def UpdatePostKey(opener):
         return post_key[0]
 
 
+def PrintUrlErrorMsg(e):
+    if hasattr(e, 'reason'):
+        print '[URLError] reason: ' + str(e.reason)
+    elif hasattr(e, 'code'):
+        print '[URLError] code: ' + str(e.code)
+    else:
+        print '[URLError] Unkonwn reason.'
+
+
 def Login():
     opener = GenerateOpener(Header)
     pixiv_key = UpdatePostKey(opener)
@@ -135,12 +144,7 @@ def Login():
         op_login = opener.open(pixiv_url_login_post, post_data)
         op_login.close()
     except urllib2.URLError, e:
-        if hasattr(e, 'reason'):
-            print '[URLError] reason: ' + str(e.reason)
-        elif hasattr(e, 'code'):
-            print '[URLError] code: ' + str(e.code)
-        else:
-            print '[URLError] Unkonwn reason.'
+        PrintUrlErrorMsg(e)
     except:
         print 'others error.'
     else:
@@ -174,14 +178,19 @@ def SaveToFile(full_path, data, overwrite = False):
             o.write(data)
     except:
         print u'保存出错.'
+        return False
+    else:
+        return True
 
 
 def HandleManga(title, mag_url):
     response = opener.open(mag_url)
     html = Gzip(response.read())
     pages = re.findall('data-src="(.*?)"', html, re.S)
+    result = True
     for i in range(len(pages)):
-        HandleImage(title, pages[i])
+        result &= HandleImage(title, pages[i])
+    return result
 
 
 def HandleImage(title, img_url, overwrite = False):
@@ -201,23 +210,30 @@ def HandleImage(title, img_url, overwrite = False):
     full_path = FileSaveDirectory + ValidFileName(title)
     if IsFileExists(full_path):
         print (u'已存在文件 ' + full_path + u', 跳过').encode('GB18030')
-        return
+        return True
+
     try:
         ii = opener.open(ori_url)
-        SaveToFile(full_path, ii.read())
+        return SaveToFile(full_path, ii.read())
     except urllib2.URLError, e:
         if hasattr(e, 'code') and e.code == 404:            # 以png作为后缀重试
-            new_last1 = last1[0] + '_' + last1[1] + '.png'
-            ori_url = ori_url.replace(new_last, new_last1)
-            title = title.replace('.jpg', '.png')
+            try:
+                new_last1 = last1[0] + '_' + last1[1] + '.png'
+                ori_url = ori_url.replace(new_last, new_last1)
+                title = title.replace('.jpg', '.png')
 
-            full_path = FileSaveDirectory + ValidFileName(title)
-            if IsFileExists(full_path):
-                print (u'已存在文件 ' + full_path + u', 跳过').encode('GB18030')
-                return
+                full_path = FileSaveDirectory + ValidFileName(title)
+                if IsFileExists(full_path):
+                    print (u'已存在文件 ' + full_path + u', 跳过').encode('GB18030')
+                    return True
 
-            ii = opener.open(ori_url)
-            SaveToFile(full_path, ii.read())
+                ii = opener.open(ori_url)
+                return SaveToFile(full_path, ii.read())
+            except:
+                PrintUrlErrorMsg(e)
+        else:
+            PrintUrlErrorMsg(e)
+        return False
 
 
 def HandleGif(title, zip_url):
@@ -229,10 +245,10 @@ def HandleGif(title, zip_url):
     full_path = FileSaveDirectory + ValidFileName(name)
     if IsFileExists(full_path):
         print (u'已存在文件 ' + full_path + u', 跳过').encode('GB18030')
-        return
+        return True
 
     ii = opener.open(zip_url)
-    SaveToFile(full_path, ii.read())
+    return SaveToFile(full_path, ii.read())
 
 
 def ParsePage(opener, url):
@@ -247,32 +263,34 @@ def ParsePage(opener, url):
         manga = re.findall('<div class="works_display"><a href="', html, re.S)
         if manga:
             # 漫画模式
-            HandleManga(title, url.replace("medium", "manga"))
+            return HandleManga(title, url.replace("medium", "manga"))
 
         else:
             zip = re.findall('"src":"(.*?)"', html, re.S)
             if zip:
                 # gif动画模式
                 # 这里的zip包链接需要去除转义的反斜杠
+                result = True
                 for i in range(len(zip)):
                     zip_url = zip[i].replace('\\', '')
-                    HandleGif(title, zip_url)
+                    result &= HandleGif(title, zip_url)
+                return result
 
             else:
                 # 普通模式
                 img_url = re.findall('<div class="works_display"><.*?><img src="(.*?)"', html, re.S)
                 if len(img_url) > 1:
                     print "[Debug] multi image url in normal mode. (%s)" %(url)
-                HandleImage(title, img_url[0])
+                return HandleImage(title, img_url[0])
 
     except urllib2.URLError, e:
-        if hasattr(e, 'code'):
-            print '[Debug] URLError, code: ' + str(e.code)
-        elif hasattr(e, 'reason'):
-            print '[Debug] URLError, reason: ' + str(e.reason)
-        else:
-            print '[Debug] URLError, Unkonwn reason.'
-        return
+        PrintUrlErrorMsg(e)
+        return False
+
+
+def LogErrorPage(url):
+    with open("PixivErrorPage.txt", 'a') as ff:
+        ff.write(url + '\r\n')
 
 
 def GetIllustationListViaPixivId(opener, pid):
@@ -326,7 +344,9 @@ def GetIllustationListViaPixivId(opener, pid):
         page_cnt += 1
 
     for url in img_list:
-        ParsePage(opener, url)
+        result = ParsePage(opener, url)
+        if not result:
+            LogErrorPage(url)
 
 
 def GetIllustationListViaPixivIdList(opener):
