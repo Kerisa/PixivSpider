@@ -288,9 +288,13 @@ def ParsePage(opener, url):
         return False
 
 
-def LogErrorPage(url):
+def LogFailedPage(url):
     with open("PixivErrorPage.txt", 'a') as ff:
         ff.write(url + '\r\n')
+
+
+def LogSuccessPage(url):
+    pass
 
 
 def GetIllustationListViaPixivId(opener, pid):
@@ -346,7 +350,9 @@ def GetIllustationListViaPixivId(opener, pid):
     for url in img_list:
         result = ParsePage(opener, url)
         if not result:
-            LogErrorPage(url)
+            LogFailedPage(url)
+        else:
+            LogSuccessPage(url)
 
 
 def GetIllustationListViaPixivIdList(opener):
