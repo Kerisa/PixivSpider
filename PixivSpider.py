@@ -24,6 +24,7 @@ pixiv_url_login_post = "https://accounts.pixiv.net/api/login"
 
 CookieFileName = 'PixivCookie.txt'
 PixivIdListFileName = "PixivIdList.txt"
+PixivDownloadedImagesFileName = "PixivDownloadedImages.txt"
 
 # 在 GetIllustationListViaPixivId 中修改，用以控制保存文件路径
 FileSaveDirectory = u''
@@ -57,6 +58,14 @@ def Gzip(data):
     buf = StringIO(data)
     f = gzip.GzipFile(fileobj=buf)
     return f.read()
+
+
+def GetIllustIdFromURL(url):
+    res = re.findall('illust_id=([\d]+)', url)
+    if len(res) == 1:
+        return int(res[0])
+    else:
+        return 0
 
 
 def PrintUrlErrorMsg(e):
@@ -169,20 +178,34 @@ def ValidFileName(filename):
 
 
 def SaveToFile(full_path, data, overwrite = False):
-    if not overwrite:
-        if os.path.exists(full_path):
-            print (u'已存在文件 ' + full_path + u', 跳过').encode('GB18030')
-    try:
-        with open(full_path, 'wb') as o:
-            o.write(data)
-    except:
-        print u'保存出错.'
-        return False
+    if not overwrite and os.path.exists(full_path):
+        print (u'已存在文件 ' + full_path + u', 跳过').encode('GB18030')
     else:
-        return True
+        try:
+            with open(full_path, 'wb') as o:
+                o.write(data)
+        except:
+            print u'保存出错.'
+            return False
+    return True
 
 
 ################################################################################
+
+DownloadedImage = set()
+
+def LoadDownloadedImages():
+    global DownloadedImage
+    if not os.path.exists(PixivDownloadedImagesFileName):
+        f = open(PixivDownloadedImagesFileName, 'w')
+        f.close()
+    else:
+        with open(PixivDownloadedImagesFileName, "r") as f:
+            line = f.readline()
+            while line:
+                DownloadedImage.add(int(line.strip('\n')))
+                line = f.readline()
+    print u'已下载列表加载完成，读取到%d个Id' %(len(DownloadedImage))
 
 
 def LogFailedPage(url):
@@ -191,7 +214,14 @@ def LogFailedPage(url):
 
 
 def LogSuccessPage(url):
-    pass
+    id = GetIllustIdFromURL(url)
+    if id > 0:
+        if not (id in DownloadedImage):            
+            DownloadedImage.add(id)
+            with open("PixivDownloadedImages.txt", "a") as f:
+                f.write(str(id) + '\n')
+    else:
+        print '[debug] log error : ' + url
 
 
 ################################################################################
@@ -329,12 +359,7 @@ def GetIllustationListViaPixivId(opener, pid):
             img_list.append(MainPage + item.replace("amp;", ""))
 
     except urllib2.URLError, e:
-        if hasattr(e, 'code'):
-            print '[Debug] URLError, code: ' + str(e.code)
-        elif hasattr(e, 'reason'):
-            print '[Debug] URLError, reason: ' + str(e.reason)
-        else:
-            print '[Debug] URLError, Unkonwn reason.'
+        PrintUrlErrorMsg(e)
         return
 
     page_cnt = 2
@@ -349,16 +374,16 @@ def GetIllustationListViaPixivId(opener, pid):
                 img_list.append(MainPage + item.replace("amp;", ""))
 
         except urllib2.URLError, e:
-            if hasattr(e, 'code'):
-                print '[Debug] URLError, code: ' + str(e.code)
-            elif hasattr(e, 'reason'):
-                print '[Debug] URLError, reason: ' + str(e.reason)
-            else:
-                print '[Debug] URLError, Unkonwn reason.'
+            PrintUrlErrorMsg(e)
             return
         page_cnt += 1
 
     for url in img_list:
+        id = GetIllustIdFromURL(url)
+        if id > 0 and (id in DownloadedImage):
+            print u'id %d 已下载.' %(id)
+            continue
+
         result = ParsePage(opener, url)
         if not result:
             LogFailedPage(url)
@@ -394,6 +419,7 @@ def GetIllustationListViaPixivIdList(opener):
 
 
 if __name__ == "__main__":
+    LoadDownloadedImages()
     opener = GetOpenerFromCookie(Header)
     if not IsLoggedIn(opener):
         print "not founed cookie file or invalid cookie file, loggin..."
@@ -402,7 +428,6 @@ if __name__ == "__main__":
         GlobalCookie.save()
     if IsLoggedIn(opener):
         print "Login Succeess."
-        assert(opener)
         GetIllustationListViaPixivIdList(opener)
 
     else:
