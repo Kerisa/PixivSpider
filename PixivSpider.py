@@ -53,17 +53,22 @@ Header = {
 }
 
 
-class PixivItem:
-    def __init__(self):
-        self.title = ''
-        self.illust_id = ''
-        self.img_url = ''
-
-
 def Gzip(data):
     buf = StringIO(data)
     f = gzip.GzipFile(fileobj=buf)
     return f.read()
+
+
+def PrintUrlErrorMsg(e):
+    if hasattr(e, 'reason'):
+        print '[URLError] reason: ' + str(e.reason)
+    elif hasattr(e, 'code'):
+        print '[URLError] code: ' + str(e.code)
+    else:
+        print '[URLError] Unkonwn reason.'
+
+
+################################################################################
 
 
 def GenerateOpener(header):
@@ -119,15 +124,6 @@ def UpdatePostKey(opener):
         return post_key[0]
 
 
-def PrintUrlErrorMsg(e):
-    if hasattr(e, 'reason'):
-        print '[URLError] reason: ' + str(e.reason)
-    elif hasattr(e, 'code'):
-        print '[URLError] code: ' + str(e.code)
-    else:
-        print '[URLError] Unkonwn reason.'
-
-
 def Login():
     opener = GenerateOpener(Header)
     pixiv_key = UpdatePostKey(opener)
@@ -149,6 +145,9 @@ def Login():
         print 'others error.'
     else:
         return opener
+
+
+################################################################################
 
 
 def IsFileExists(path):
@@ -181,6 +180,21 @@ def SaveToFile(full_path, data, overwrite = False):
         return False
     else:
         return True
+
+
+################################################################################
+
+
+def LogFailedPage(url):
+    with open("PixivErrorPage.txt", 'a') as ff:
+        ff.write(url + '\r\n')
+
+
+def LogSuccessPage(url):
+    pass
+
+
+################################################################################
 
 
 def HandleManga(title, mag_url):
@@ -251,6 +265,9 @@ def HandleGif(title, zip_url):
     return SaveToFile(full_path, ii.read())
 
 
+################################################################################
+
+
 def ParsePage(opener, url):
     print '[Debug]: open ' + url
     try:
@@ -288,13 +305,7 @@ def ParsePage(opener, url):
         return False
 
 
-def LogFailedPage(url):
-    with open("PixivErrorPage.txt", 'a') as ff:
-        ff.write(url + '\r\n')
-
-
-def LogSuccessPage(url):
-    pass
+################################################################################
 
 
 def GetIllustationListViaPixivId(opener, pid):
@@ -355,6 +366,9 @@ def GetIllustationListViaPixivId(opener, pid):
             LogSuccessPage(url)
 
 
+################################################################################
+
+
 def GetIllustationListViaPixivIdList(opener):
     # 通过文件读取画师ID列表
     if not os.path.exists(PixivIdListFileName):
@@ -374,6 +388,9 @@ def GetIllustationListViaPixivIdList(opener):
 
     for id in list:
         GetIllustationListViaPixivId(opener, id)
+
+
+################################################################################
 
 
 if __name__ == "__main__":
