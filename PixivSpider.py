@@ -273,8 +273,24 @@ def HandleImage(title, img_url, overwrite = False):
 
                 ii = opener.open(ori_url)
                 return SaveToFile(full_path, ii.read())
-            except:
-                PrintUrlErrorMsg(e)
+            except urllib2.URLError, e:
+                if hasattr(e, 'code') and e.code == 404:            # 以gif作为后缀重试
+                    try:
+                        new_last2 = last1[0] + '_' + last1[1] + '.gif'
+                        ori_url = ori_url.replace(new_last1, new_last2)
+                        title = title.replace('.png', '.gif')
+
+                        full_path = FileSaveDirectory + ValidFileName(title)
+                        if IsFileExists(full_path):
+                            print (u'已存在文件 ' + full_path + u', 跳过').encode('GB18030')
+                            return True
+
+                        ii = opener.open(ori_url)
+                        return SaveToFile(full_path, ii.read())
+                    except:
+                        PrintUrlErrorMsg(e)
+                else:
+                    PrintUrlErrorMsg(e)
         else:
             PrintUrlErrorMsg(e)
         return False
