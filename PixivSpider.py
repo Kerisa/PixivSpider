@@ -205,7 +205,7 @@ def LoadDownloadedImages():
             while line:
                 DownloadedImage.add(int(line.strip('\n')))
                 line = f.readline()
-    print u'已下载列表加载完成，读取到%d个Id' %(len(DownloadedImage))
+    print u'已下载列表加载完成，读取到%d个已下载的插画Id' %(len(DownloadedImage))
 
 
 def LogFailedPage(url):
@@ -231,8 +231,11 @@ def HandleManga(title, mag_url):
     response = opener.open(mag_url)
     html = Gzip(response.read())
     pages = re.findall('data-src="(.*?)"', html, re.S)
+    totalPic = int(re.findall('<span class="total">(.*?)</span>', html, re.S)[0])
     result = True
     for i in range(len(pages)):
+        if i >= totalPic:                # 按总数进行提取，以免分析到广告图片
+            break
         result &= HandleImage(title, pages[i])
     return result
 
@@ -425,7 +428,7 @@ def GetIllustationListViaPixivIdList(opener):
             line = line.strip('\r')
             list.append(line.strip('\n'))
             line = f.readline()
-    print u'完成，读取到%d个Id' %(len(list))
+    print u'完成，读取到%d个画师Id' %(len(list))
 
     for id in list:
         GetIllustationListViaPixivId(opener, id)
