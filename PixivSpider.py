@@ -17,6 +17,17 @@ import gzip
 from StringIO import StringIO
 
 
+class ImgInfo:
+    def __init__(self):
+        self.webUrl=''
+        self.webContent=''
+        self.originalImgUrl=''
+        self.title=''
+        self.pageCount=0
+        self.illustId=0
+        self.type=''
+
+
 MainPage = "http://www.pixiv.net/"
 LoginPage = "https://accounts.pixiv.net/login"
 LoginPage_Post = "https://accounts.pixiv.net/api/login?lang=zh"
@@ -185,7 +196,7 @@ def SaveToFile(full_path, data, overwrite = False):
             with open(full_path, 'wb') as o:
                 o.write(data)
         except:
-            print u'保存出错.'
+            print u'保存 %s 失败.' %(full_path)
             return False
     return True
 
@@ -208,15 +219,16 @@ def LoadDownloadedImages():
     print u'已下载列表加载完成，读取到%d个已下载的插画Id' %(len(DownloadedImage))
 
 
-def LogFailedPage(url):
+def LogFailedPage(dir, url):
+    str = u'' + dir + u'*' + url + u'\n'
     with open("PixivErrorPage.txt", 'a') as ff:
-        ff.write(url + '\r\n')
+        ff.write(str)
 
 
 def LogSuccessPage(url):
     id = GetIllustIdFromURL(url)
     if id > 0:
-        if not (id in DownloadedImage):            
+        if not (id in DownloadedImage):
             DownloadedImage.add(id)
             with open("PixivDownloadedImages.txt", "a") as f:
                 f.write(str(id) + '\n')
@@ -240,7 +252,11 @@ def HandleManga(title, mag_url):
     return result
 
 
+################################################################################
+
+
 def HandleImage(title, img_url, overwrite = False):
+    print '[dbg] imgUrl = ' + img_url
     # 转换为原图的url
     old_last = img_url.split("/")[-1]                       # 形如 60442846_p0_master1200.jpg
     last1 = old_last.split("_")
@@ -317,37 +333,104 @@ def HandleGif(title, zip_url):
 ################################################################################
 
 
+def SaveImage(img):
+    slashPos = img.originalImgUrl.rfind('/')
+    dotPos = img.originalImgUrl.rfind('.')
+    title = img.originalImgUrl[slashPos+1:dotPos] # illustId_pX 部分
+    title += '_'
+    title += img.title
+    title += img.originalImgUrl[dotPos:len(img.originalImgUrl)]
+
+    full_path = FileSaveDirectory + ValidFileName(title)
+    if IsFileExists(full_path):
+        print (u'已存在文件 ' + full_path + u', 跳过').encode('GB18030')
+        return True
+
+    try:
+        ii = opener.open(img.originalImgUrl)
+        return SaveToFile(full_path, ii.read())
+    except urllib2.URLError, e:
+        PrintUrlErrorMsg(e)
+        return False
+
+
+################################################################################
+
+
+def GetIllustPageType(img):
+    img.type = 'unknown'
+
+    js = re.findall('\(({token: ".*?})\);</script>', img.webContent, re.S)
+    if len(js) == 0:
+        print '[dbg] error main data not found'
+        return 'unknown'
+
+    removePart = re.findall('"userIllusts":{.*?"likeData":false,', js[0], re.S)    # 去除干扰, 其他推荐的插画属性中也有 pageCount 字段
+    if len(removePart) == 0:
+        print '[dbg] removePart not found'
+
+    js[0] = js[0].replace(removePart[0], '')
+    pageCount = re.findall('"pageCount":([\d]+),', js[0], re.S)
+    illustType = re.findall('"illustType":([\d]+)', js[0], re.S)
+    if len(pageCount) != 1 or len(illustType) != 1:
+        print "[dbg] error 'pageCount' or 'illustType'"
+        return 'unknown'
+
+    illustId = re.findall('"illustId":"([\d]+)"', js[0], re.S)
+    if len(illustId) != 1:
+        print '[dbg] error illustId'
+        return 'unknown'
+
+    img.illustId = int(illustId[0])
+
+    url = re.findall('"original":"(.*?)"', js[0])
+    if len(url) == 0:
+        print '[dbg] error original url'
+    img.originalImgUrl = url[0].replace('\\', '')
+
+    if int(illustType[0]) == 0:
+        if int(pageCount[0]) == 1:
+            img.pageCount = 1
+            img.type = 'single'
+        elif int(pageCount[0]) > 1:
+            img.pageCount = int(pageCount[0])
+            img.type = 'manga'
+    elif int(illustType[0]) == 2:
+        img.type = 'gif'
+
+    print '[dbg] illustType=%d, pageCount=%d' % (int(illustType[0]), int(pageCount[0]))
+    return img.type
+
+
+################################################################################
+
+
 def ParsePage(opener, url):
     print '[Debug]: open ' + url
+    img = ImgInfo()
+    img.webUrl = url
     try:
         response = opener.open(url)
-        html = Gzip(response.read())
+        img.webContent = Gzip(response.read())
 
-        tmp = re.findall("<title>「(.*?)」.*?</title>", html, re.S)
-        title = tmp[0].decode("utf-8")
+        tmp = re.findall("<title>「(.*?)」.*?</title>", img.webContent, re.S)
+        img.title = tmp[0].decode("utf-8")
 
-        manga = re.findall('<div class="works_display"><a href="', html, re.S)
-        if manga:
-            # 漫画模式
-            return HandleManga(title, url.replace("medium", "manga"))
-
+        type = GetIllustPageType(img)
+        if type == 'manga':
+            return HandleManga(img.title, url.replace("medium", "manga"))
+        elif type == 'gif':
+            zipUrl = img.originalImgUrl
+            zipUrl = zipUrl.replace('img-original', 'img-zip-ugoira')
+            lastPart = zipUrl[zipUrl.rfind('/')+1:len(zipUrl)]      # 提取最后文件id相关部分，如 65922304_ugoira0.jpg
+            newLastPart = lastPart[0:lastPart.find('_')+1]
+            newLastPart += 'ugoira1920x1080.zip'    # 1920x1080 代表原始gif, 600x600 代表缩小后的 gif, 所以固定用最大的即可
+            zipUrl = zipUrl.replace(lastPart, newLastPart)
+            HandleGif(img.title, zipUrl)
+        elif type == 'single':
+            return SaveImage(img)
         else:
-            zip = re.findall('"src":"(.*?)"', html, re.S)
-            if zip:
-                # gif动画模式
-                # 这里的zip包链接需要去除转义的反斜杠
-                result = True
-                for i in range(len(zip)):
-                    zip_url = zip[i].replace('\\', '')
-                    result &= HandleGif(title, zip_url)
-                return result
-
-            else:
-                # 普通模式
-                img_url = re.findall('<div class="works_display"><.*?><img src="(.*?)"', html, re.S)
-                if len(img_url) > 1:
-                    print "[Debug] multi image url in normal mode. (%s)" %(url)
-                return HandleImage(title, img_url[0])
+            print '[wrn] parse page error - ' + url
 
     except urllib2.URLError, e:
         PrintUrlErrorMsg(e)
@@ -361,11 +444,6 @@ def GetIllustationListViaPixivId(opener, pid):
     # 获取一个画师的所有插画
     print "[Debug] process Id: %s" %(pid)
 
-    global FileSaveDirectory
-    FileSaveDirectory = pid + '\\'
-    if not os.path.exists(pid):
-        os.makedirs(pid)
-
     page_url = "http://www.pixiv.net/member_illust.php?id=%s" %(pid)
     img_list = []
 
@@ -373,6 +451,14 @@ def GetIllustationListViaPixivId(opener, pid):
     try:
         response = opener.open(page_url)
         html = Gzip(response.read())
+
+        title = re.findall('<title>「(.*?)」.*?</title>', html, re.S)[0].decode('utf-8')
+        global FileSaveDirectory
+        FileSaveDirectory = ValidFileName(title) + ' ' + pid + '\\'
+        print FileSaveDirectory
+        if not os.path.exists(FileSaveDirectory):
+            os.makedirs(FileSaveDirectory)
+
         tmp = re.findall('<li class="image-item.?"><a href="/(.*?)"', html, re.S)
         for item in tmp:
             img_list.append(MainPage + item.replace("amp;", ""))
@@ -403,11 +489,22 @@ def GetIllustationListViaPixivId(opener, pid):
             print u'id %d 已下载.' %(id)
             continue
 
-        result = ParsePage(opener, url)
+        result = 0
+        for retry in range(3):
+            result = ParsePage(opener, url)
+            if result:
+                break
+            else:
+                time.sleep(1)
+                print '[Debug] retry'
+
         if not result:
-            LogFailedPage(url)
+            LogFailedPage(pid, url)
         else:
             LogSuccessPage(url)
+
+        time.sleep(1)
+
 
 
 ################################################################################
