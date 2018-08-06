@@ -45,8 +45,8 @@ pixiv_password ='<禁则事项>'
 
 
 Logindata = {
-    'pixiv_id':'y1598753y@126.com',
-    'password':'1qazxsw2',
+    'pixiv_id':pixiv_id,
+    'password':pixiv_password,
     'captcha':'',
     'g_recaptcha_response':'',
     'post_key':'',
@@ -365,11 +365,19 @@ def GetIllustPageType(img):
         print '[dbg] error main data not found'
         return 'unknown'
 
-    removePart = re.findall('"userIllusts":{.*?"likeData":false,', js[0], re.S)    # 去除干扰, 其他推荐的插画属性中也有 pageCount 字段
+    # 去除干扰, 其他推荐的插画属性中也有 pageCount 字段
+    removePart = re.findall('"userIllusts":{.*?"likeData":false,', js[0], re.S)
     if len(removePart) == 0:
         print '[dbg] removePart not found'
+    for remove in removePart:
+        js[0] = js[0].replace(remove, '')
 
-    js[0] = js[0].replace(removePart[0], '')
+    # 去除干扰, 延伸作品的插画属性中也有 illustType 字段
+    removePart = re.findall('"imageResponseData":\[.*?\]', js[0], re.S)
+    for remove in removePart:
+        js[0] = js[0].replace(remove, '')
+
+
     pageCount = re.findall('"pageCount":([\d]+),', js[0], re.S)
     illustType = re.findall('"illustType":([\d]+)', js[0], re.S)
     if len(pageCount) != 1 or len(illustType) != 1:
@@ -388,7 +396,7 @@ def GetIllustPageType(img):
         print '[dbg] error original url'
     img.originalImgUrl = url[0].replace('\\', '')
 
-    if int(illustType[0]) == 0:
+    if int(illustType[0]) == 0 or int(illustType[0]) == 1:
         if int(pageCount[0]) == 1:
             img.pageCount = 1
             img.type = 'single'
@@ -455,7 +463,7 @@ def GetIllustationListViaPixivId(opener, pid):
         title = re.findall('<title>「(.*?)」.*?</title>', html, re.S)[0].decode('utf-8')
         global FileSaveDirectory
         FileSaveDirectory = ValidFileName(title) + ' ' + pid + '\\'
-        print FileSaveDirectory
+        #print FileSaveDirectory
         if not os.path.exists(FileSaveDirectory):
             os.makedirs(FileSaveDirectory)
 
