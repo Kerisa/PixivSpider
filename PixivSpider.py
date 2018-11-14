@@ -188,7 +188,7 @@ def ValidFileName(filename):
     return filename
 
 
-def SaveToFile(full_path, data, overwrite = False):
+def SaveToFile(img_url, full_path, data, overwrite = False):
     if not overwrite and os.path.exists(full_path):
         print (u'已存在文件 ' + full_path + u', 跳过').encode('GB18030')
     else:
@@ -196,7 +196,7 @@ def SaveToFile(full_path, data, overwrite = False):
             with open(full_path, 'wb') as o:
                 o.write(data)
         except:
-            print u'保存 %s 失败.' %(full_path)
+            print u'保存 %s 失败.' %(img_url)
             return False
     return True
 
@@ -277,7 +277,7 @@ def HandleImage(title, img_url, overwrite = False):
 
     try:
         ii = opener.open(ori_url)
-        return SaveToFile(full_path, ii.read())
+        return SaveToFile(img_url, full_path, ii.read())
     except urllib2.URLError, e:
         if hasattr(e, 'code') and e.code == 404:            # 以png作为后缀重试
             try:
@@ -291,7 +291,7 @@ def HandleImage(title, img_url, overwrite = False):
                     return True
 
                 ii = opener.open(ori_url)
-                return SaveToFile(full_path, ii.read())
+                return SaveToFile(img_url, full_path, ii.read())
             except urllib2.URLError, e:
                 if hasattr(e, 'code') and e.code == 404:            # 以gif作为后缀重试
                     try:
@@ -305,7 +305,7 @@ def HandleImage(title, img_url, overwrite = False):
                             return True
 
                         ii = opener.open(ori_url)
-                        return SaveToFile(full_path, ii.read())
+                        return SaveToFile(img_url, full_path, ii.read())
                     except:
                         PrintUrlErrorMsg(e)
                 else:
@@ -327,7 +327,7 @@ def HandleGif(title, zip_url):
         return True
 
     ii = opener.open(zip_url)
-    return SaveToFile(full_path, ii.read())
+    return SaveToFile(zip_url, full_path, ii.read())
 
 
 ################################################################################
@@ -348,7 +348,7 @@ def SaveImage(img):
 
     try:
         ii = opener.open(img.originalImgUrl)
-        return SaveToFile(full_path, ii.read())
+        return SaveToFile(img.originalImgUrl, full_path, ii.read())
     except urllib2.URLError, e:
         PrintUrlErrorMsg(e)
         return False
@@ -434,7 +434,7 @@ def ParsePage(opener, url):
             newLastPart = lastPart[0:lastPart.find('_')+1]
             newLastPart += 'ugoira1920x1080.zip'    # 1920x1080 代表原始gif, 600x600 代表缩小后的 gif, 所以固定用最大的即可
             zipUrl = zipUrl.replace(lastPart, newLastPart)
-            HandleGif(img.title, zipUrl)
+            return HandleGif(img.title, zipUrl)
         elif type == 'single':
             return SaveImage(img)
         else:
