@@ -11,6 +11,7 @@ import time
 import os
 import sys
 import io
+import json
 
 # for gzip
 import gzip
@@ -190,13 +191,13 @@ def ValidFileName(filename):
 
 def SaveToFile(img_url, full_path, data, overwrite = False):
     if not overwrite and os.path.exists(full_path):
-        print (u'已存在文件 ' + full_path + u', 跳过').encode('GB18030')
+        print (u'file ' + full_path + u' existing, skip').encode('GB18030')
     else:
         try:
             with open(full_path, 'wb') as o:
                 o.write(data)
         except:
-            print u'保存 %s 失败.' %(img_url)
+            print 'failed saving %s to file.' %(img_url)
             return False
     return True
 
@@ -216,7 +217,7 @@ def LoadDownloadedImages():
             while line:
                 DownloadedImage.add(int(line.strip('\n')))
                 line = f.readline()
-    print u'已下载列表加载完成，读取到%d个已下载的插画Id' %(len(DownloadedImage))
+    print 'download list loading success, got %d downloaded illust ID' %(len(DownloadedImage))
 
 
 def LogFailedPage(dir, url):
@@ -272,7 +273,7 @@ def HandleImage(title, img_url, overwrite = False):
 
     full_path = FileSaveDirectory + ValidFileName(title)
     if IsFileExists(full_path):
-        print (u'已存在文件 ' + full_path + u', 跳过').encode('GB18030')
+        print (u'file ' + full_path + u' existing, skip').encode('GB18030')
         return True
 
     try:
@@ -287,7 +288,7 @@ def HandleImage(title, img_url, overwrite = False):
 
                 full_path = FileSaveDirectory + ValidFileName(title)
                 if IsFileExists(full_path):
-                    print (u'已存在文件 ' + full_path + u', 跳过').encode('GB18030')
+                    print (u'file ' + full_path + u' existing, skip').encode('GB18030')
                     return True
 
                 ii = opener.open(ori_url)
@@ -301,7 +302,7 @@ def HandleImage(title, img_url, overwrite = False):
 
                         full_path = FileSaveDirectory + ValidFileName(title)
                         if IsFileExists(full_path):
-                            print (u'已存在文件 ' + full_path + u', 跳过').encode('GB18030')
+                            print (u'file ' + full_path + u' existing, skip').encode('GB18030')
                             return True
 
                         ii = opener.open(ori_url)
@@ -323,7 +324,7 @@ def HandleGif(title, zip_url):
 
     full_path = FileSaveDirectory + ValidFileName(name)
     if IsFileExists(full_path):
-        print (u'已存在文件 ' + full_path + u', 跳过').encode('GB18030')
+        print (u'file ' + full_path + u' existing, skip').encode('GB18030')
         return True
 
     ii = opener.open(zip_url)
@@ -343,7 +344,7 @@ def SaveImage(img):
 
     full_path = FileSaveDirectory + ValidFileName(title)
     if IsFileExists(full_path):
-        print (u'已存在文件 ' + full_path + u', 跳过').encode('GB18030')
+        print (u'file ' + full_path + u' existing, skip').encode('GB18030')
         return True
 
     try:
@@ -449,17 +450,26 @@ def ParsePage(opener, url):
 
 
 def GetIllustationListViaPixivId(opener, pid):
-    # 获取一个画师的所有插画
+    # 获取一位画师的所有插画
     print "[Debug] process Id: %s" %(pid)
 
-    page_url = "http://www.pixiv.net/member_illust.php?id=%s" %(pid)
-    img_list = []
+    page_url = "http://www.pixiv.net/member.php?id=%s" %(pid)
+    illus_list_url = 'https://www.pixiv.net/touch/ajax/illust/user_illusts?user_id=%s' %(pid)
 
-    # 第一页
+    values = {
+        'Referer':page_url,
+        'User-Agent':'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Mobile Safari/537.36'
+    }
+
     try:
+        # 获得列表
+        request = urllib2.Request(illus_list_url, headers=values)
+        response = opener.open(request)
+        img_id_str_list = json.loads(Gzip(response.read()))
+
+        # 创建文件夹
         response = opener.open(page_url)
         html = Gzip(response.read())
-
         title = re.findall('<title>「(.*?)」.*?</title>', html, re.S)[0].decode('utf-8')
         global FileSaveDirectory
         FileSaveDirectory = ValidFileName(title) + ' ' + pid + '\\'
@@ -467,36 +477,17 @@ def GetIllustationListViaPixivId(opener, pid):
         if not os.path.exists(FileSaveDirectory):
             os.makedirs(FileSaveDirectory)
 
-        tmp = re.findall('<li class="image-item.?"><a href="/(.*?)"', html, re.S)
-        for item in tmp:
-            img_list.append(MainPage + item.replace("amp;", ""))
-
     except urllib2.URLError, e:
         PrintUrlErrorMsg(e)
         return
 
-    page_cnt = 2
-    while (re.findall('<span class="next"><a href=', html, re.S)):
-        # 后续
-        page_url = "http://www.pixiv.net/member_illust.php?id=%s&type=all&p=%d" %(pid, page_cnt)
-        try:
-            response = opener.open(page_url)
-            html = Gzip(response.read())
-            tmp = re.findall('<li class="image-item.?"><a href="/(.*?)"', html, re.S)      # MainPage带有一个正斜杠, 这里少配一个
-            for item in tmp:
-                img_list.append(MainPage + item.replace("amp;", ""))
-
-        except urllib2.URLError, e:
-            PrintUrlErrorMsg(e)
-            return
-        page_cnt += 1
-
-    for url in img_list:
-        id = GetIllustIdFromURL(url)
-        if id > 0 and (id in DownloadedImage):
-            print u'id %d 已下载.' %(id)
+    for str in img_id_str_list:
+        img_id = int(str)
+        if img_id > 0 and (img_id in DownloadedImage):
+            print u'image %d has downloaded, continue.' %(img_id)
             continue
 
+        url = 'https://www.pixiv.net/member_illust.php?mode=medium&illust_id=%d' %(img_id)
         result = 0
         for retry in range(3):
             result = ParsePage(opener, url)
@@ -504,7 +495,7 @@ def GetIllustationListViaPixivId(opener, pid):
                 break
             else:
                 time.sleep(1)
-                print '[Debug] retry'
+                print '[Debug] retry %d' %(img_id)
 
         if not result:
             LogFailedPage(pid, url)
@@ -521,9 +512,10 @@ def GetIllustationListViaPixivId(opener, pid):
 def GetIllustationListViaPixivIdList(opener):
     # 通过文件读取画师ID列表
     if not os.path.exists(PixivIdListFileName):
-        print u'未找到画师Id列表文件 ' + PixivIdListFileName
+        print u'creators ID list file `%s` not found' %(PixivIdListFileName)
         return False
-    print u'读取列表...',
+
+    print 'reading creators ID...',
     list = []
     with open(PixivIdListFileName, "r") as f:
         line = f.readline()
@@ -533,7 +525,7 @@ def GetIllustationListViaPixivIdList(opener):
             line = line.strip('\r')
             list.append(line.strip('\n'))
             line = f.readline()
-    print u'完成，读取到%d个画师Id' %(len(list))
+    print 'done, %d ID read' %(len(list))
 
     for id in list:
         GetIllustationListViaPixivId(opener, id)
