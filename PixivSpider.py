@@ -12,6 +12,7 @@ import os
 import sys
 import io
 import json
+import platform
 
 # for gzip
 import gzip
@@ -37,6 +38,10 @@ pixiv_url_login_post = "https://accounts.pixiv.net/api/login"
 CookieFileName = 'PixivCookie.txt'
 PixivIdListFileName = "PixivIdList.txt"
 PixivDownloadedImagesFileName = "PixivDownloadedImages.txt"
+
+SYSTEM_PATH_DIVIDER = '/'
+if platform.system() == 'Windows':
+    SYSTEM_PATH_DIVIDER = '\\'
 
 # 在 GetIllustationListViaPixivId 中修改，用以控制保存文件路径
 FileSaveDirectory = u''
@@ -64,7 +69,7 @@ Header = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) '
                   'Chrome/50.0.2661.102 Safari/537.36'
 }
-
+Proxy = urllib2.ProxyHandler({'http': '127.0.0.1:8087'})
 
 def Gzip(data):
     buf = StringIO(data)
@@ -82,7 +87,10 @@ def GetIllustIdFromURL(url):
 
 def PrintUrlErrorMsg(e):
     if hasattr(e, 'reason'):
-        print '[URLError] reason: ' + str(e.reason)
+        if hasattr(e, 'code'):
+            print '[URLError] reason: ' + str(e.reason) + ' code: ' + str(e.code)
+        else:
+            print '[URLError] reason: ' + str(e.reason)
     elif hasattr(e, 'code'):
         print '[URLError] code: ' + str(e.code)
     else:
@@ -189,13 +197,26 @@ def ValidFileName(filename):
     return filename
 
 
-def SaveToFile(img_url, full_path, data, overwrite = False):
+def SaveToFile(img_url, full_path, overwrite = False):
     if not overwrite and os.path.exists(full_path):
-        print (u'file ' + full_path + u' existing, skip').encode('GB18030')
+        print 'file [' + img_url + '] existing, skip'
     else:
         try:
+            ii = opener.open(img_url)
+            length = 0
+            if ii.headers.has_key('content-length'):
+                length = int(ii.headers['content-length'])
             with open(full_path, 'wb') as o:
-                o.write(data)
+                o.write(ii.read())
+
+            if length > 0 and os.path.getsize(full_path) != length:
+                print 'saveing ' + img_url + ' imcomplete'
+                os.remove(full_path)
+                return False
+
+        except urllib2.URLError, e:
+            PrintUrlErrorMsg(e)
+            return False
         except:
             print 'failed saving %s to file.' %(img_url)
             return False
@@ -273,47 +294,36 @@ def HandleImage(title, img_url, overwrite = False):
 
     full_path = FileSaveDirectory + ValidFileName(title)
     if IsFileExists(full_path):
-        print (u'file ' + full_path + u' existing, skip').encode('GB18030')
+        print 'file [' + img_url + '] existing, skip'
         return True
 
-    try:
-        ii = opener.open(ori_url)
-        return SaveToFile(img_url, full_path, ii.read())
-    except urllib2.URLError, e:
-        if hasattr(e, 'code') and e.code == 404:            # 以png作为后缀重试
-            try:
-                new_last1 = last1[0] + '_' + last1[1] + '.png'
-                ori_url = ori_url.replace(new_last, new_last1)
-                title = title.replace('.jpg', '.png')
+    if not SaveToFile(ori_url, full_path):
+        # 以png作为后缀重试
+        new_last1 = last1[0] + '_' + last1[1] + '.png'
+        ori_url = ori_url.replace(new_last, new_last1)
+        title = title.replace('.jpg', '.png')
 
-                full_path = FileSaveDirectory + ValidFileName(title)
-                if IsFileExists(full_path):
-                    print (u'file ' + full_path + u' existing, skip').encode('GB18030')
-                    return True
+        print '[dbg] retry png: ' + ori_url
+        full_path = FileSaveDirectory + ValidFileName(title)
+        if IsFileExists(full_path):
+            print 'file [' + ori_url + '] existing, skip'
+            return True
 
-                ii = opener.open(ori_url)
-                return SaveToFile(img_url, full_path, ii.read())
-            except urllib2.URLError, e:
-                if hasattr(e, 'code') and e.code == 404:            # 以gif作为后缀重试
-                    try:
-                        new_last2 = last1[0] + '_' + last1[1] + '.gif'
-                        ori_url = ori_url.replace(new_last1, new_last2)
-                        title = title.replace('.png', '.gif')
+        if not SaveToFile(ori_url, full_path):
+            # 以gif作为后缀重试
+            new_last2 = last1[0] + '_' + last1[1] + '.gif'
+            ori_url = ori_url.replace(new_last1, new_last2)
+            title = title.replace('.png', '.gif')
 
-                        full_path = FileSaveDirectory + ValidFileName(title)
-                        if IsFileExists(full_path):
-                            print (u'file ' + full_path + u' existing, skip').encode('GB18030')
-                            return True
+            print '[dbg] retry gif: ' + ori_url
+            full_path = FileSaveDirectory + ValidFileName(title)
+            if IsFileExists(full_path):
+                print 'file [' + ori_url + '] existing, skip'
+                return True
 
-                        ii = opener.open(ori_url)
-                        return SaveToFile(img_url, full_path, ii.read())
-                    except:
-                        PrintUrlErrorMsg(e)
-                else:
-                    PrintUrlErrorMsg(e)
-        else:
-            PrintUrlErrorMsg(e)
-        return False
+            return SaveToFile(ori_url, full_path)
+
+    return False
 
 
 def HandleGif(title, zip_url):
@@ -324,11 +334,10 @@ def HandleGif(title, zip_url):
 
     full_path = FileSaveDirectory + ValidFileName(name)
     if IsFileExists(full_path):
-        print (u'file ' + full_path + u' existing, skip').encode('GB18030')
+        print 'file [' + zip_url + '] existing, skip'
         return True
 
-    ii = opener.open(zip_url)
-    return SaveToFile(zip_url, full_path, ii.read())
+    return SaveToFile(zip_url, full_path)
 
 
 ################################################################################
@@ -344,12 +353,11 @@ def SaveImage(img):
 
     full_path = FileSaveDirectory + ValidFileName(title)
     if IsFileExists(full_path):
-        print (u'file ' + full_path + u' existing, skip').encode('GB18030')
+        print 'file [' + img.originalImgUrl + '] existing, skip'
         return True
 
     try:
-        ii = opener.open(img.originalImgUrl)
-        return SaveToFile(img.originalImgUrl, full_path, ii.read())
+        return SaveToFile(img.originalImgUrl, full_path)
     except urllib2.URLError, e:
         PrintUrlErrorMsg(e)
         return False
@@ -358,13 +366,13 @@ def SaveImage(img):
 ################################################################################
 
 
-def GetIllustPageType(img):
+def DetermineIllustPageType(img):
     img.type = 'unknown'
 
     js = re.findall('\(({token: ".*?})\);</script>', img.webContent, re.S)
     if len(js) == 0:
         print '[dbg] error main data not found'
-        return 'unknown'
+        return
 
     # 去除干扰, 其他推荐的插画属性中也有 pageCount 字段
     removePart = re.findall('"userIllusts":{.*?"likeData":false,', js[0], re.S)
@@ -383,12 +391,12 @@ def GetIllustPageType(img):
     illustType = re.findall('"illustType":([\d]+)', js[0], re.S)
     if len(pageCount) != 1 or len(illustType) != 1:
         print "[dbg] error 'pageCount' or 'illustType'"
-        return 'unknown'
+        return
 
     illustId = re.findall('"illustId":"([\d]+)"', js[0], re.S)
     if len(illustId) != 1:
         print '[dbg] error illustId'
-        return 'unknown'
+        return
 
     img.illustId = int(illustId[0])
 
@@ -408,7 +416,7 @@ def GetIllustPageType(img):
         img.type = 'gif'
 
     print '[dbg] illustType=%d, pageCount=%d' % (int(illustType[0]), int(pageCount[0]))
-    return img.type
+    return
 
 
 ################################################################################
@@ -422,13 +430,13 @@ def ParsePage(opener, url):
         response = opener.open(url)
         img.webContent = Gzip(response.read())
 
-        tmp = re.findall("<title>「(.*?)」.*?</title>", img.webContent, re.S)
+        tmp = re.findall("<title>.*?「(.*?)」.*?</title>", img.webContent, re.S)
         img.title = tmp[0].decode("utf-8")
 
-        type = GetIllustPageType(img)
-        if type == 'manga':
+        DetermineIllustPageType(img)
+        if img.type == 'manga':
             return HandleManga(img.title, url.replace("medium", "manga"))
-        elif type == 'gif':
+        elif img.type == 'gif':
             zipUrl = img.originalImgUrl
             zipUrl = zipUrl.replace('img-original', 'img-zip-ugoira')
             lastPart = zipUrl[zipUrl.rfind('/')+1:len(zipUrl)]      # 提取最后文件id相关部分，如 65922304_ugoira0.jpg
@@ -436,7 +444,7 @@ def ParsePage(opener, url):
             newLastPart += 'ugoira1920x1080.zip'    # 1920x1080 代表原始gif, 600x600 代表缩小后的 gif, 所以固定用最大的即可
             zipUrl = zipUrl.replace(lastPart, newLastPart)
             return HandleGif(img.title, zipUrl)
-        elif type == 'single':
+        elif img.type == 'single':
             return SaveImage(img)
         else:
             print '[wrn] parse page error - ' + url
@@ -472,7 +480,7 @@ def GetIllustationListViaPixivId(opener, pid):
         html = Gzip(response.read())
         title = re.findall('<title>「(.*?)」.*?</title>', html, re.S)[0].decode('utf-8')
         global FileSaveDirectory
-        FileSaveDirectory = ValidFileName(title) + ' ' + pid + '\\'
+        FileSaveDirectory = ValidFileName(title) + ' ' + pid + SYSTEM_PATH_DIVIDER
         #print FileSaveDirectory
         if not os.path.exists(FileSaveDirectory):
             os.makedirs(FileSaveDirectory)
@@ -480,11 +488,14 @@ def GetIllustationListViaPixivId(opener, pid):
     except urllib2.URLError, e:
         PrintUrlErrorMsg(e)
         return
+    except:
+        print 'error getting list'
+        return
 
     for str in img_id_str_list:
         img_id = int(str)
         if img_id > 0 and (img_id in DownloadedImage):
-            print u'image %d has downloaded, continue.' %(img_id)
+            print 'image %d has downloaded, continue.' %(img_id)
             continue
 
         url = 'https://www.pixiv.net/member_illust.php?mode=medium&illust_id=%d' %(img_id)
@@ -512,7 +523,7 @@ def GetIllustationListViaPixivId(opener, pid):
 def GetIllustationListViaPixivIdList(opener):
     # 通过文件读取画师ID列表
     if not os.path.exists(PixivIdListFileName):
-        print u'creators ID list file `%s` not found' %(PixivIdListFileName)
+        print 'creators ID list file `%s` not found' %(PixivIdListFileName)
         return False
 
     print 'reading creators ID...',
