@@ -172,7 +172,7 @@ def Login():
 ################################################################################
 
 
-def SaveToFile(img_url, full_path, overwrite = False):
+def SaveToFile(opener, img_url, full_path, overwrite = False):
     if not overwrite and utils.IsFileExists(full_path):
         log.info('`SaveToFile` file [%s] existing, skip', img_url)
         return True
@@ -199,7 +199,7 @@ def SaveToFile(img_url, full_path, overwrite = False):
                 PrintUrlErrorMsg(e)
             return False
         except:
-            log.warn('failed saving %s to file.', img_url)
+            log.error_stack('failed saving %s to file.', img_url)
             if utils.IsFileExists(full_path, withSize = False):
                 os.remove(full_path)
             return False
@@ -234,7 +234,7 @@ def LogSuccessPage(img):
 ################################################################################
 
 
-def HandleManga(title, mag_url):
+def HandleManga(opener, title, mag_url):
     response = opener.open(mag_url)
     html = utils.Gzip(response.read())
     pages = re.findall('data-src="(.*?)"', html, re.S)
@@ -243,14 +243,14 @@ def HandleManga(title, mag_url):
     for i in range(len(pages)):
         if i >= totalPic:                # 按总数进行提取，以免分析到广告图片
             break
-        result &= HandleMangaImage(title, pages[i])
+        result &= HandleMangaImage(opener, title, pages[i])
     return result
 
 
 ################################################################################
 
 
-def HandleMangaImage(title, img_url, overwrite = False):
+def HandleMangaImage(opener, title, img_url, overwrite = False):
     log.debug('HandleMangaImage url = ' + img_url)
     # 转换为原图的url
     old_last = img_url.split("/")[-1]                       # 形如 60442846_p0_master1200.jpg
@@ -270,7 +270,7 @@ def HandleMangaImage(title, img_url, overwrite = False):
         log.info('`HandleMangaImage` file [%s] existing, skip', img_url)
         return True
 
-    if not SaveToFile(ori_url, full_path):
+    if not SaveToFile(opener, ori_url, full_path):
         # 以png作为后缀重试
         new_last1 = last1[0] + '_' + last1[1] + '.png'
         ori_url = ori_url.replace(new_last, new_last1)
@@ -282,7 +282,7 @@ def HandleMangaImage(title, img_url, overwrite = False):
             log.info('`HandleMangaImage` file [%s] existing, skip', ori_url)
             return True
 
-        if not SaveToFile(ori_url, full_path):
+        if not SaveToFile(opener, ori_url, full_path):
             # 以gif作为后缀重试
             new_last2 = last1[0] + '_' + last1[1] + '.gif'
             ori_url = ori_url.replace(new_last1, new_last2)
@@ -294,14 +294,14 @@ def HandleMangaImage(title, img_url, overwrite = False):
                 log.info('`HandleMangaImage` file [%s] existing, skip', ori_url)
                 return True
 
-            return SaveToFile(ori_url, full_path)
+            return SaveToFile(opener, ori_url, full_path)
         else:
             return True
     else:
         return True
 
 
-def HandleGif(title, zip_url):
+def HandleGif(opener, title, zip_url):
     log.debug('HandleGif url %s', zip_url)
 
     tmp = zip_url.split('/')[-1].split(".")[0]
@@ -312,13 +312,13 @@ def HandleGif(title, zip_url):
         log.info('zip file [%s] existing, skip', zip_url)
         return True
 
-    return SaveToFile(zip_url, full_path)
+    return SaveToFile(opener, zip_url, full_path)
 
 
 ################################################################################
 
 
-def SaveSingleImage(img):
+def SaveSingleImage(opener, img):
     slashPos = img.originalImgUrl.rfind('/')
     dotPos = img.originalImgUrl.rfind('.')
     title = img.originalImgUrl[slashPos+1:dotPos] # illustId_pX 部分
@@ -332,7 +332,7 @@ def SaveSingleImage(img):
         return True
 
     try:
-        return SaveToFile(img.originalImgUrl, full_path)
+        return SaveToFile(opener, img.originalImgUrl, full_path)
     except urllib2.URLError, e:
         PrintUrlErrorMsg(e)
         return False
@@ -399,7 +399,6 @@ def DetermineIllustPageType(img):
 
 def DetermineIllustTags(img):
     tags = re.findall('"tag":"(.*?)",', img.webContent, re.S)
-    assert len(tags) >= 1
     img.tags = ''
     for t in tags:
         img.tags += ',' + t.decode('unicode-escape')
@@ -424,7 +423,7 @@ def ParsePage(opener, img):
 
         if img.type == 'manga':
             url = img.webUrl
-            return HandleManga(img.title, url.replace("medium", "manga"))
+            return HandleManga(opener, img.title, url.replace("medium", "manga"))
         elif img.type == 'gif':
             zipUrl = img.originalImgUrl
             zipUrl = zipUrl.replace('img-original', 'img-zip-ugoira')
@@ -432,9 +431,9 @@ def ParsePage(opener, img):
             newLastPart = lastPart[0:lastPart.find('_')+1]
             newLastPart += 'ugoira1920x1080.zip'    # 1920x1080 代表原始gif, 600x600 代表缩小后的 gif, 所以固定用最大的即可
             zipUrl = zipUrl.replace(lastPart, newLastPart)
-            return HandleGif(img.title, zipUrl)
+            return HandleGif(opener, img.title, zipUrl)
         elif img.type == 'single':
-            return SaveSingleImage(img)
+            return SaveSingleImage(opener, img)
         else:
             log.warn('parse page error - %s', img.webUrl)
 
@@ -617,7 +616,7 @@ def ImportOldDataToDB():
 
     # 读取 txt 中的插画 ID
     if not utils.IsFileExists(PixivDownloadedImagesFileName):
-        log.info('file' + PixivIdListFileName + 'is missing or empty, skip.')
+        log.info('file `' + PixivDownloadedImagesFileName + '` is missing or empty, skip.')
     else:
         illust_in_txt = set()
         with open(PixivDownloadedImagesFileName, "r") as f:
@@ -639,12 +638,10 @@ def ImportOldDataToDB():
             time.sleep(0.7)
             illusts = GetAllIllustOfCreator(opener, id)
             log.debug('creator %d downloaded', id)
-            print(illusts)
-            log.debug(illusts)
             for i in illusts:
                 newest[int(i)] = int(id)
         log.info('done, start import...')
-        print(newest)
+
         to_db = []
         some_failed = False
         for img in illust_in_txt:

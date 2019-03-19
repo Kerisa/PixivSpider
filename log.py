@@ -38,6 +38,10 @@ def warn(format, *tupleArg):
     g_Log.warn(format, *tupleArg)
 
 
+def error_stack(format, *tupleArg):
+    g_Log.error(format, *tupleArg, exc_info = True)
+
+
 def error(format, *tupleArg):
     g_Log.error(format, *tupleArg)
 
