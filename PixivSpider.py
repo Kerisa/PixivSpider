@@ -503,8 +503,9 @@ def GetAllIllustOfCreator(opener, author_id):
             data = response.read()
             img_id_str_list = json.loads(utils.Gzip(data))
         except IOError, e:
-            log.debug('creator %s illust list not json data, try as plain data', author_id)
-            img_id_str_list = json.loads(data)
+            log.debug('creator %s illust list not json data, maybe this ID is not valid any more', author_id)
+            #img_id_str_list = json.loads(data)
+            img_id_str_list = []
 
         return img_id_str_list
 
@@ -577,8 +578,8 @@ def NormalDownload():
     if opener is not None:
         for id in creators:
             imgs = GetAllIllustOfCreator(opener, id)
-            SetupSavingFolder(opener, id)
-            ProcessCreator(opener, id, imgs)
+            if SetupSavingFolder(opener, id):
+                ProcessCreator(opener, id, imgs)
 
     log.info('download finish.')
 
