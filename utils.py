@@ -5,13 +5,10 @@ import re
 
 # for gzip
 import gzip
-from StringIO import StringIO
 
 
 def Gzip(data):
-    buf = StringIO(data)
-    f = gzip.GzipFile(fileobj=buf)
-    return f.read()
+    return gzip.decompress(data).decode()
 
 def GetIllustIdFromURL(url):
     res = re.findall('illust_id=([\d]+)', url)
@@ -29,15 +26,13 @@ def IsFileExists(path, withSize = True):
 
 
 def ValidFileName(filename):
-    assert(unicode == type(filename))
-    filename = filename.replace(u'/', u'／')
-    filename = filename.replace(u'\\', u'＼')
-    filename = filename.replace(u':', u'：')
-    filename = filename.replace(u'<', u'＜')
-    filename = filename.replace(u'>', u'＞')
-    filename = filename.replace(u'*', u'＊')
-    filename = filename.replace(u'|', u'｜')
-    filename = filename.replace(u'?', u'？')
-    filename = filename.replace(u'"', u'＂')
-#    print filename.encode('GB18030')
+    filename = filename.replace('/', '／')
+    filename = filename.replace('\\', '＼')
+    filename = filename.replace(':', '：')
+    filename = filename.replace('<', '＜')
+    filename = filename.replace('>', '＞')
+    filename = filename.replace('*', '＊')
+    filename = filename.replace('|', '｜')
+    filename = filename.replace('?', '？')
+    filename = filename.replace('"', '＂')
     return filename

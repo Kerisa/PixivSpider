@@ -16,7 +16,7 @@ def InitDB():
         log.exception('`%s` is missing!', DB_DEF_FILE)
 
     with open(DB_DEF_FILE) as f:
-        GetDB().executescript(f.read().decode('utf8'))
+        GetDB().executescript(f.read())
 
 
 def CloseDB():

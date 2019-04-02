@@ -20,7 +20,7 @@ def InitLogger():
     g_Log.addHandler(stream_handler)
 
     # file
-    file_handler = logging.FileHandler('record.log')
+    file_handler = logging.FileHandler('record.log', encoding = 'utf-8')
     file_handler.setLevel(level = logging.DEBUG)
     file_handler.setFormatter(formatter)
     g_Log.addHandler(file_handler)

@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
-import urllib
-import urllib2
-import cookielib
+import urllib.request, urllib.parse, urllib.error
+import urllib.request, urllib.error, urllib.parse
+import http.cookiejar
 import re
-import Queue
+import queue
 import string
-import thread
+import _thread
 import threading
 import time
 import os
@@ -13,11 +13,6 @@ import sys
 import io
 import json
 import platform
-
-# for gzip
-import gzip
-from StringIO import StringIO
-
 
 import log
 import db
@@ -48,7 +43,7 @@ if platform.system() == 'Windows':
     SYSTEM_PATH_DIVIDER = '\\'
 
 # 在 GetIllustationListViaPixivId 中修改，用以控制保存文件路径
-FileSaveDirectory = u''
+FileSaveDirectory = ''
 
 pixiv_id = '<禁则事项>'
 pixiv_password ='<禁则事项>'
@@ -71,11 +66,13 @@ Header = {
     'Referer': 'http://www.pixiv.net/',
     'Upgrade-Insecure-Requests': '1',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) '
-                  'Chrome/50.0.2661.102 Safari/537.36'
+                  'Chrome/73.0.3683.86 Safari/537.36'
 }
-Proxy = urllib2.ProxyHandler({'http': '127.0.0.1:8087'})
+
+Proxy = urllib.request.ProxyHandler({'http': '127.0.0.1:8087'})
 
 
+################################################################################
 
 
 def PrintUrlErrorMsg(e):
@@ -97,11 +94,11 @@ def GenerateOpener(header):
     if os.path.exists(CookieFileName):
         os.remove(CookieFileName)
     global GlobalCookie
-    GlobalCookie = cookielib.MozillaCookieJar(CookieFileName)
-    cp = urllib2.HTTPCookieProcessor(GlobalCookie)
-    op = urllib2.build_opener(cp)
+    GlobalCookie = http.cookiejar.MozillaCookieJar(CookieFileName)
+    cp = urllib.request.HTTPCookieProcessor(GlobalCookie)
+    op = urllib.request.build_opener(cp)
     h = []
-    for key, value in header.items():
+    for key, value in list(header.items()):
         elem = (key, value)
         h.append(elem)
     op.addheaders = h
@@ -110,13 +107,13 @@ def GenerateOpener(header):
 
 def GetOpenerFromCookie(header):
     global GlobalCookie
-    GlobalCookie = cookielib.MozillaCookieJar()
+    GlobalCookie = http.cookiejar.MozillaCookieJar()
     if os.path.exists(CookieFileName):
         GlobalCookie.load(CookieFileName)
-    cp = urllib2.HTTPCookieProcessor(GlobalCookie)
-    op = urllib2.build_opener(cp)
+    cp = urllib.request.HTTPCookieProcessor(GlobalCookie)
+    op = urllib.request.build_opener(cp)
     h = []
-    for key, value in header.items():
+    for key, value in list(header.items()):
         elem = (key, value)
         h.append(elem)
     op.addheaders = h
@@ -156,12 +153,12 @@ def Login():
         'post_key': pixiv_key,
         'source': 'accounts'
     }
-    post_data = urllib.urlencode(post_data).encode('utf-8')
+    post_data = urllib.parse.urlencode(post_data).encode('utf-8')
 
     try:
         op_login = opener.open(pixiv_url_login_post, post_data)
         op_login.close()
-    except urllib2.URLError, e:
+    except urllib.error.URLError as e:
         PrintUrlErrorMsg(e)
     except:
         log.exception('others error occurred while loggin.')
@@ -180,7 +177,7 @@ def SaveToFile(opener, img_url, full_path, overwrite = False):
         try:
             ii = opener.open(img_url)
             length = 0
-            if ii.headers.has_key('content-length'):
+            if 'content-length' in ii.headers:
                 length = int(ii.headers['content-length'])
             with open(full_path, 'wb') as o:
                 o.write(ii.read())
@@ -192,7 +189,7 @@ def SaveToFile(opener, img_url, full_path, overwrite = False):
 
             return True
 
-        except urllib2.URLError, e:
+        except urllib.error.URLError as e:
             if hasattr(e, 'code') and e.code == 404:
                 log.debug('http 404: %s', img_url)
             else:
@@ -238,7 +235,13 @@ def HandleManga(opener, title, mag_url):
     response = opener.open(mag_url)
     html = utils.Gzip(response.read())
     pages = re.findall('data-src="(.*?)"', html, re.S)
-    totalPic = int(re.findall('<span class="total">(.*?)</span>', html, re.S)[0])
+    listTotalPic = re.findall('<span class="total">(.*?)</span>', html, re.S)
+    if len(listTotalPic) != 1:
+        log.warn('`HandleManga` total img num not found. result is %d', len(listTotalPic))
+        log.debug(html)
+        return False
+
+    totalPic = int(listTotalPic[0])
     result = True
     for i in range(len(pages)):
         if i >= totalPic:                # 按总数进行提取，以免分析到广告图片
@@ -263,7 +266,7 @@ def HandleMangaImage(opener, title, img_url, overwrite = False):
     ori_url += img_url.split("img-master/")[1]
     ori_url = ori_url.replace(old_last, new_last)
 
-    title = (last1[0] + '_' + last1[1] + '_').decode('utf-8') + title + ('.' + last2[1]).decode('utf-8')
+    title = (last1[0] + '_' + last1[1] + '_') + title + ('.' + last2[1])
 
     full_path = FileSaveDirectory + utils.ValidFileName(title)
     if utils.IsFileExists(full_path):
@@ -333,7 +336,7 @@ def SaveSingleImage(opener, img):
 
     try:
         return SaveToFile(opener, img.originalImgUrl, full_path)
-    except urllib2.URLError, e:
+    except urllib.error.URLError as e:
         PrintUrlErrorMsg(e)
         return False
 
@@ -401,7 +404,10 @@ def DetermineIllustTags(img):
     tags = re.findall('"tag":"(.*?)",', img.webContent, re.S)
     img.tags = ''
     for t in tags:
-        img.tags += ',' + t.decode('unicode-escape')
+        # for tag like 'Fate/GO1000users入り'(r'Fate\/GO1000users\u5165\u308a')
+        # will result a "DeprecationWarning: invalid escape sequence '\/'"
+        # and remain it unchanged, so replace it first, if any
+        img.tags += ',' + t.replace('\\/', '/').encode().decode('unicode-escape')
     img.tags = img.tags[1:]
     log.debug('`DetermineIllustTags` find tags = %s', img.tags)
 
@@ -416,7 +422,7 @@ def ParsePage(opener, img):
         img.webContent = utils.Gzip(response.read())
 
         tmp = re.findall("<title>.*?「(.*?)」.*?</title>", img.webContent, re.S)
-        img.title = tmp[0].decode("utf-8")
+        img.title = tmp[0]
 
         DetermineIllustPageType(img)
         DetermineIllustTags(img)
@@ -437,7 +443,7 @@ def ParsePage(opener, img):
         else:
             log.warn('parse page error - %s', img.webUrl)
 
-    except urllib2.URLError, e:
+    except urllib.error.URLError as e:
         PrintUrlErrorMsg(e)
         return False
 
@@ -496,20 +502,20 @@ def GetAllIllustOfCreator(opener, author_id):
 
     try:
         # 获得列表
-        request = urllib2.Request(illus_list_url, headers=values)
+        request = urllib.request.Request(illus_list_url, headers=values)
         response = opener.open(request)
 
         try:
             data = response.read()
             img_id_str_list = json.loads(utils.Gzip(data))
-        except IOError, e:
+        except IOError as e:
             log.debug('creator %s illust list not json data, maybe this ID is not valid any more', author_id)
             #img_id_str_list = json.loads(data)
             img_id_str_list = []
 
         return img_id_str_list
 
-    except urllib2.URLError, e:
+    except urllib.error.URLError as e:
         PrintUrlErrorMsg(e)
         return []
 
@@ -526,7 +532,7 @@ def SetupSavingFolder(opener, author_id):
         html = utils.Gzip(response.read())
         creator = db.FindCreatorInfoViaID(author_id)
         if creator['name'] is None:
-            title = re.findall('<title>「(.*?)」.*?</title>', html, re.S)[0].decode('utf-8')
+            title = re.findall('<title>「(.*?)」.*?</title>', html, re.S)[0]
             db.UpdateCreatorName(author_id, title)
         else:
             title = creator['name']
@@ -539,7 +545,7 @@ def SetupSavingFolder(opener, author_id):
 
         return True
 
-    except urllib2.URLError, e:
+    except urllib.error.URLError as e:
         PrintUrlErrorMsg(e)
         log.info('create saving folder [%s] failed.', FileSaveDirectory)
         return False
@@ -646,7 +652,7 @@ def ImportOldDataToDB():
         to_db = []
         some_failed = False
         for img in illust_in_txt:
-            if newest.has_key(int(img)):
+            if int(img) in newest:
                 to_db.append((int(img), newest[int(img)],))
             else:
                 some_failed = True
