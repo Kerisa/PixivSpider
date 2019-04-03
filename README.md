@@ -1,9 +1,9 @@
 # PixivSpider
 基于 python3.7 写的P站爬虫
 ## 使用
-1 . 在 \_\_main\_\_.py 的 `pixiv_id`、`pixiv_password` 处填入有效的P站帐号及密码  
+1 . 在 pixivspider-data\config.ini 的 `pixiv_id`、`pixiv_password` 处填入有效的P站帐号及密码  
 2 . 添加画师 ID  
- - 首先运行一次脚本，在当前目录下会生成 `pixivspider-data` 子目录，自动初始化一个空的数据库文件 `download.db`，使用 `DB Browser for SQLite`(https://sqlitebrowser.org/dl/) 打开数据库中的 `creator` 数据表，在 `id` 列中添加画师的 ID 即可  
+ - 首先运行一次脚本，在 `pixivspider-data` 子目录中会自动初始化一个空的数据库文件 `download.db`，使用 `DB Browser for SQLite`(https://sqlitebrowser.org/dl/) 打开数据库中的 `creator` 数据表，在 `id` 列中添加画师的 ID 即可  
  - 或在 `pixivspider` 文件夹所在目录下提供一个存有画师 ID 的文本文件 `PixivIdList.txt`(格式为每行一个 ID)，运行 `python pixivspider --import` 命令进行导入  
 
 3 . P 站在国内已经需要挂梯子访问了，所以需要自行解决梯子问题（推荐扔到外网机器上下载）  
