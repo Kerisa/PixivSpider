@@ -41,8 +41,6 @@ pixiv_url_login_post = "https://accounts.pixiv.net/api/login"
 # 在 GetIllustationListViaPixivId 中修改，用以控制保存文件路径
 FileSaveDirectory = ''
 
-#pixiv_id = '<禁则事项>'
-#pixiv_password ='<禁则事项>'
 
 
 Logindata = {
@@ -53,6 +51,7 @@ Logindata = {
     'post_key':'',
     'source':'accounts',
 }
+
 Header = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
     'Accept-Encoding': 'gzip, deflate, sdch',
@@ -132,10 +131,8 @@ def UpdatePostKey(opener):
     post_key = re.findall('name="post_key" value="(.*?)"', data, re.S)
     if len(post_key) == 0:
         log.warn('not found post_key! maybe is logged in.')
-        Logindata['post_key'] = ''
         return ''
     else:
-        Logindata['post_key'] = post_key[0]
         return post_key[0]
 
 
@@ -144,8 +141,8 @@ def Login():
     pixiv_key = UpdatePostKey(opener)
 
     post_data = {
-        'pixiv_id': pixiv_id,
-        'password': pixiv_password,
+        'pixiv_id': conf.GetAccountName(),
+        'password': conf.GetAccountPwd(),
         'post_key': pixiv_key,
         'source': 'accounts'
     }
