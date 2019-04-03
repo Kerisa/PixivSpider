@@ -7,3 +7,5 @@
 /PixivDownloadedImages.txt
 /PixivErrorPage.txt
 /PixivIdList.txt
+/pixivspider/__pycache__
+/pixivspider-data

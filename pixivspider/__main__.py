@@ -17,6 +17,7 @@ import platform
 import log
 import db
 import utils
+import conf
 
 class ImgInfo:
     def __init__(self):
@@ -36,17 +37,12 @@ LoginPage = "https://accounts.pixiv.net/login"
 LoginPage_Post = "https://accounts.pixiv.net/api/login?lang=zh"
 pixiv_url_login_post = "https://accounts.pixiv.net/api/login"
 
-CookieFileName = 'PixivCookie.txt'
-
-SYSTEM_PATH_DIVIDER = '/'
-if platform.system() == 'Windows':
-    SYSTEM_PATH_DIVIDER = '\\'
 
 # 在 GetIllustationListViaPixivId 中修改，用以控制保存文件路径
 FileSaveDirectory = ''
 
-pixiv_id = '<禁则事项>'
-pixiv_password ='<禁则事项>'
+#pixiv_id = '<禁则事项>'
+#pixiv_password ='<禁则事项>'
 
 
 Logindata = {
@@ -91,10 +87,10 @@ def PrintUrlErrorMsg(e):
 
 
 def GenerateOpener(header):
-    if os.path.exists(CookieFileName):
-        os.remove(CookieFileName)
+    if os.path.exists(conf.GetCookiePath()):
+        os.remove(conf.GetCookiePath())
     global GlobalCookie
-    GlobalCookie = http.cookiejar.MozillaCookieJar(CookieFileName)
+    GlobalCookie = http.cookiejar.MozillaCookieJar(conf.GetCookiePath())
     cp = urllib.request.HTTPCookieProcessor(GlobalCookie)
     op = urllib.request.build_opener(cp)
     h = []
@@ -108,8 +104,8 @@ def GenerateOpener(header):
 def GetOpenerFromCookie(header):
     global GlobalCookie
     GlobalCookie = http.cookiejar.MozillaCookieJar()
-    if os.path.exists(CookieFileName):
-        GlobalCookie.load(CookieFileName)
+    if os.path.exists(conf.GetCookiePath()):
+        GlobalCookie.load(conf.GetCookiePath())
     cp = urllib.request.HTTPCookieProcessor(GlobalCookie)
     op = urllib.request.build_opener(cp)
     h = []
@@ -268,7 +264,7 @@ def HandleMangaImage(opener, title, img_url, overwrite = False):
 
     title = (last1[0] + '_' + last1[1] + '_') + title + ('.' + last2[1])
 
-    full_path = FileSaveDirectory + utils.ValidFileName(title)
+    full_path = os.path.join(FileSaveDirectory, utils.ValidFileName(title))
     if utils.IsFileExists(full_path):
         log.info('`HandleMangaImage` file [%s] existing, skip', img_url)
         return True
@@ -280,7 +276,7 @@ def HandleMangaImage(opener, title, img_url, overwrite = False):
         title = title.replace('.jpg', '.png')
 
         log.debug('retry png: ' + ori_url)
-        full_path = FileSaveDirectory + utils.ValidFileName(title)
+        full_path = os.path.join(FileSaveDirectory, utils.ValidFileName(title))
         if utils.IsFileExists(full_path):
             log.info('`HandleMangaImage` file [%s] existing, skip', ori_url)
             return True
@@ -292,7 +288,7 @@ def HandleMangaImage(opener, title, img_url, overwrite = False):
             title = title.replace('.png', '.gif')
 
             log.debug('retry gif: ' + ori_url)
-            full_path = FileSaveDirectory + utils.ValidFileName(title)
+            full_path = os.path.join(FileSaveDirectory, utils.ValidFileName(title))
             if utils.IsFileExists(full_path):
                 log.info('`HandleMangaImage` file [%s] existing, skip', ori_url)
                 return True
@@ -310,7 +306,7 @@ def HandleGif(opener, title, zip_url):
     tmp = zip_url.split('/')[-1].split(".")[0]
     name = tmp + title + '.zip'
 
-    full_path = FileSaveDirectory + utils.ValidFileName(name)
+    full_path = os.path.join(FileSaveDirectory, utils.ValidFileName(name))
     if utils.IsFileExists(full_path):
         log.info('zip file [%s] existing, skip', zip_url)
         return True
@@ -329,7 +325,7 @@ def SaveSingleImage(opener, img):
     title += img.title
     title += img.originalImgUrl[dotPos:len(img.originalImgUrl)]
 
-    full_path = FileSaveDirectory + utils.ValidFileName(title)
+    full_path = os.path.join(FileSaveDirectory, utils.ValidFileName(title))
     if utils.IsFileExists(full_path):
         log.info('file [%s] existing, skip', img.originalImgUrl)
         return True
@@ -538,7 +534,7 @@ def SetupSavingFolder(opener, author_id):
             title = creator['name']
 
         global FileSaveDirectory
-        FileSaveDirectory = 'downloads' + SYSTEM_PATH_DIVIDER + utils.ValidFileName(title) + ' ' + str(author_id) + SYSTEM_PATH_DIVIDER
+        FileSaveDirectory = os.path.join(conf.GetDownloadsDir(), utils.ValidFileName(title) + ' ' + str(author_id))
 
         if not os.path.exists(FileSaveDirectory):
             os.makedirs(FileSaveDirectory)

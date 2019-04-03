@@ -4,18 +4,16 @@ import os
 import sqlite3
 
 import log
-
-DB_FILE_NAME = 'download.db'
-DB_DEF_FILE = 'db_def.sql'
+import conf
 
 g_db = None
 
 
 def InitDB():
-    if not os.path.exists(DB_DEF_FILE):
-        log.exception('`%s` is missing!', DB_DEF_FILE)
+    if not os.path.exists(conf.GetDBDefinePath()):
+        log.exception('`%s` is missing!', conf.GetDBDefinePath())
 
-    with open(DB_DEF_FILE) as f:
+    with open(conf.GetDBDefinePath()) as f:
         GetDB().executescript(f.read())
 
 
@@ -30,9 +28,9 @@ def CloseDB():
 def GetDB():
     global g_db
     if not g_db:
-        exist = os.path.exists(DB_FILE_NAME)
+        exist = os.path.exists(conf.GetDBPath())
         g_db = sqlite3.connect(
-            DB_FILE_NAME,
+            conf.GetDBPath(),
             detect_types=sqlite3.PARSE_DECLTYPES
         )
         g_db.row_factory = sqlite3.Row
@@ -41,7 +39,7 @@ def GetDB():
                 InitDB()
             except:
                 CloseDB()
-                os.remove(DB_FILE_NAME)
+                os.remove(conf.GetDBPath())
                 raise
 
     return g_db
