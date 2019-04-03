@@ -505,8 +505,8 @@ def GetAllIllustOfCreator(opener, author_id):
             data = response.read()
             img_id_str_list = json.loads(utils.Gzip(data))
         except IOError as e:
-            log.debug('creator %s illust list not json data, maybe this ID is not valid any more', author_id)
-            #img_id_str_list = json.loads(data)
+            log.info('creator %s illust is empty, maybe this ID is not valid any more', author_id)
+            # img_id_str_list = json.loads(data)
             img_id_str_list = []
 
         return img_id_str_list
@@ -635,10 +635,10 @@ def ImportOldDataToDB():
             return
 
         # 获取所有画师的作品集
-        log.info('it may take a long time if there is a lot of imgs...')
+        log.info('it may take a long time if there is a lot of imgs...please wait')
         newest = {}
         for id in creators_in_txt:
-            time.sleep(0.7)
+            time.sleep(0.5)
             illusts = GetAllIllustOfCreator(opener, id)
             log.debug('creator %d downloaded', id)
             for i in illusts:
@@ -652,7 +652,7 @@ def ImportOldDataToDB():
                 to_db.append((int(img), newest[int(img)],))
             else:
                 some_failed = True
-                log.debug('cannot find illust %d info on web, please add manually', int(img))
+                log.info('cannot find illust %d info on web, please add manually', int(img))
         if some_failed:
             log.info('some illust cannot find on web, read log for detail')
         log.info('import to db')
