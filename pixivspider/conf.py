@@ -5,10 +5,15 @@ import configparser
 
 USER_DATA_DIR = ''
 DOWNLOADS_DIR = ''
+
+USER_ACCOUNT_NAME = ''
+USER_ACCOUNT_PWD = ''
+
+CONFIG_FILE_NAME = ''
 COOKIE_FILE_NAME = ''
 DB_FILE_NAME = ''
-DB_DEF_FILE = ''
-LOG_FILE = ''
+DB_DEF_FILE_NAME = ''
+LOG_FILE_NAME = ''
 
 def GetUserDataDir():
     global USER_DATA_DIR
@@ -27,7 +32,7 @@ def GetConfigFilePath():
 def GetAccountName():
     global USER_ACCOUNT_NAME
     if USER_ACCOUNT_NAME == '':
-        config = ConfigParser.ConfigParser()
+        config = configparser.ConfigParser()
         config.read(GetConfigFilePath())
         USER_ACCOUNT_NAME = config.get('account', 'pixiv_id')
     return USER_ACCOUNT_NAME
@@ -35,7 +40,7 @@ def GetAccountName():
 def GetAccountPwd():
     global USER_ACCOUNT_PWD
     if USER_ACCOUNT_PWD == '':
-        config = ConfigParser.ConfigParser()
+        config = configparser.ConfigParser()
         config.read(GetConfigFilePath())
         USER_ACCOUNT_PWD = config.get('account', 'pixiv_password')
     return USER_ACCOUNT_PWD
@@ -61,14 +66,14 @@ def GetDBPath():
     return DB_FILE_NAME
 
 def GetDBDefinePath():
-    global DB_DEF_FILE
-    if DB_DEF_FILE == '':
-        DB_DEF_FILE = os.path.join(os.path.dirname(__file__), 'db_def.sql')
-    return DB_DEF_FILE
+    global DB_DEF_FILE_NAME
+    if DB_DEF_FILE_NAME == '':
+        DB_DEF_FILE_NAME = os.path.join(os.path.dirname(__file__), 'db_def.sql')
+    return DB_DEF_FILE_NAME
 
 def GetLogFilePath():
-    global LOG_FILE
-    if LOG_FILE == '':
-        LOG_FILE = os.path.join(GetUserDataDir(), 'record.log')
-    return LOG_FILE
+    global LOG_FILE_NAME
+    if LOG_FILE_NAME == '':
+        LOG_FILE_NAME = os.path.join(GetUserDataDir(), 'record.log')
+    return LOG_FILE_NAME
 

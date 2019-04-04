@@ -44,8 +44,8 @@ FileSaveDirectory = ''
 
 
 Logindata = {
-    'pixiv_id':pixiv_id,
-    'password':pixiv_password,
+    'pixiv_id':'',
+    'password':'',
     'captcha':'',
     'g_recaptcha_response':'',
     'post_key':'',
