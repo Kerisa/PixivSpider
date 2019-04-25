@@ -14,6 +14,8 @@ import io
 import json
 import platform
 
+import demjson
+
 import log
 import db
 import utils
@@ -30,6 +32,8 @@ class ImgInfo:
         self.illustId=0
         self.authorId=0
         self.type=''
+        self.jsonStr=''
+        self.jsonData=''
 
 
 MainPage = "http://www.pixiv.net/"
@@ -413,6 +417,10 @@ def ParsePage(opener, img):
     try:
         response = opener.open(img.webUrl)
         img.webContent = utils.Gzip(response.read())
+        
+        tmp = re.findall("<script>.+globalInitData.+\(([{]token:.+[}])\);</script>", img.webContent, re.S)
+        img.jsonStr = tmp[0]
+        img.jsonData = demjson.decode(img.jsonStr)
 
         tmp = re.findall("<title>.*?「(.*?)」.*?</title>", img.webContent, re.S)
         img.title = tmp[0]
