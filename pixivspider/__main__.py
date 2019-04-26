@@ -261,15 +261,17 @@ def HandleManga(opener, img):
                 continue
             result &= SaveToFile(opener, url, full_path)
 
+        return result
+
     except urllib.error.URLError as e:
         PrintUrlErrorMsg(e)
-        return []
+        return False
 
 
 ################################################################################
 
 
-def HandleGif(opener, img):    
+def HandleGif(opener, img):
     gif_url = 'https://www.pixiv.net/ajax/illust/%d/ugoira_meta' %(img.illustId)
 
     values = {
@@ -311,7 +313,7 @@ def HandleGif(opener, img):
 
 def SaveSingleImage(opener, img):
     assert(img.type == 'single' and img.pageCount == 1)
-    
+
     url = img.jsonData['preload']['illust'][img.illustId]['urls']['original']
     title = '%d_p0_%s%s' %(img.illustId, img.title, url[url.rfind('.'):])
     full_path = os.path.join(FileSaveDirectory, utils.ValidFileName(title))
