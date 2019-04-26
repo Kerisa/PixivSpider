@@ -254,7 +254,7 @@ def HandleManga(opener, img):
             log.debug('manga url: %s', url)
             name = '%d_p%d_%s%s' %(img.illustId, index, utils.ValidFileName(img.title), url[url.rfind('.'):])
             log.debug('generate file name: %s', name)
-            ++index
+            index = index + 1
             full_path = os.path.join(FileSaveDirectory, name)
             if utils.IsFileExists(full_path):
                 log.info('file [%s] existing, skip', full_path)
