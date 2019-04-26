@@ -15,6 +15,7 @@ CREATE TABLE `illust` (
 	`name`	TEXT,
 	`type`	TEXT,
 	`tags`	TEXT,
+	`json_blob`  TEXT,
 	`download_time`	TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`sub_img_count`	INTEGER,
 	FOREIGN KEY (author_id) REFERENCES creator (id)

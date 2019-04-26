@@ -2,6 +2,7 @@
 
 import os
 import sqlite3
+import json
 
 import log
 import conf
@@ -100,8 +101,8 @@ def IsIllustExist(id):
 def AddSuccessIllustRecord(img):
     db = GetDB()
     db.execute(
-        'INSERT INTO illust(id, author_id, name, type, tags, sub_img_count) VALUES (?, ?, ?, ?, ?, ?)',
-        (img.illustId, img.authorId, img.title, img.type, img.tags, img.pageCount,)
+        'INSERT INTO illust(id, author_id, name, type, tags, sub_img_count, json_blob) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        (img.illustId, img.authorId, img.title, img.type, img.tags, img.pageCount, json.dumps(img.jsonData),)
     )
     db.commit()
     log.debug('db.AddSuccessIllustRecord %d', img.illustId)

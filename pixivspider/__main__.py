@@ -228,111 +228,99 @@ def LogSuccessPage(img):
 ################################################################################
 
 
-def HandleManga(opener, title, mag_url):
-    response = opener.open(mag_url)
-    html = utils.Gzip(response.read())
-    pages = re.findall('data-src="(.*?)"', html, re.S)
-    listTotalPic = re.findall('<span class="total">(.*?)</span>', html, re.S)
-    if len(listTotalPic) != 1:
-        log.warn('`HandleManga` total img num not found. result is %d', len(listTotalPic))
-        log.debug(html)
-        return False
+def HandleManga(opener, img):
+    manga_list_url = 'https://www.pixiv.net/ajax/illust/%d/pages' %(img.illustId)
 
-    totalPic = int(listTotalPic[0])
-    result = True
-    for i in range(len(pages)):
-        if i >= totalPic:                # 按总数进行提取，以免分析到广告图片
-            break
-        result &= HandleMangaImage(opener, title, pages[i])
-    return result
+    values = {
+        'Referer':img.webUrl,
+        'User-Agent':'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Mobile Safari/537.36'
+    }
+
+    try:
+        # 获得列表
+        request = urllib.request.Request(manga_list_url, headers=values)
+        response = opener.open(request)
+
+        try:
+            data = response.read()
+            img_id_str_list = json.loads(utils.Gzip(data))
+        except IOError as e:
+            log.error('error manga list of %d', img.illustId)
+
+        index = 0
+        result = True
+        for i in img_id_str_list['body']:
+            url = i['urls']['original']
+            log.debug('manga url: %s', url)
+            name = '%d_p%d_%s%s' %(img.illustId, index, utils.ValidFileName(img.title), url[url.rfind('.'):])
+            log.debug('generate file name: %s', name)
+            ++index
+            full_path = os.path.join(FileSaveDirectory, name)
+            if utils.IsFileExists(full_path):
+                log.info('file [%s] existing, skip', full_path)
+                continue
+            result &= SaveToFile(opener, url, full_path)
+
+    except urllib.error.URLError as e:
+        PrintUrlErrorMsg(e)
+        return []
 
 
 ################################################################################
 
 
-def HandleMangaImage(opener, title, img_url, overwrite = False):
-    log.debug('HandleMangaImage url = ' + img_url)
-    # 转换为原图的url
-    old_last = img_url.split("/")[-1]                       # 形如 60442846_p0_master1200.jpg
-    last1 = old_last.split("_")
-    last2 = old_last.split(".")                             # 这里缩略图的后缀只会是jpg，所以下面才直接以png重试
-    new_last = last1[0] + '_' + last1[1] + '.' + last2[1]   # 去掉 master1200  ->  60442846_p0.jpg
+def HandleGif(opener, img):    
+    gif_url = 'https://www.pixiv.net/ajax/illust/%d/ugoira_meta' %(img.illustId)
 
-    ori_url = img_url[0:20]
-    ori_url += "img-original/"
-    ori_url += img_url.split("img-master/")[1]
-    ori_url = ori_url.replace(old_last, new_last)
+    values = {
+        'Referer':img.webUrl,
+        'User-Agent':'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Mobile Safari/537.36'
+    }
 
-    title = (last1[0] + '_' + last1[1] + '_') + title + ('.' + last2[1])
+    try:
+        # 获得列表
+        request = urllib.request.Request(gif_url, headers=values)
+        response = opener.open(request)
 
-    full_path = os.path.join(FileSaveDirectory, utils.ValidFileName(title))
-    if utils.IsFileExists(full_path):
-        log.info('`HandleMangaImage` file [%s] existing, skip', img_url)
-        return True
+        try:
+            data = response.read()
+            img_id_str_list = json.loads(utils.Gzip(data))
+        except IOError as e:
+            log.error('error gif of %d', img.illustId)
+            return False
 
-    if not SaveToFile(opener, ori_url, full_path):
-        # 以png作为后缀重试
-        new_last1 = last1[0] + '_' + last1[1] + '.png'
-        ori_url = ori_url.replace(new_last, new_last1)
-        title = title.replace('.jpg', '.png')
+        url = img_id_str_list['body']['originalSrc']
+        log.debug('gif url: %s', url)
+        name = '%s_%s%s' %(url[url.rfind('/')+1:url.rfind('.')], utils.ValidFileName(img.title), url[url.rfind('.'):])
+        log.debug('generate file name: %s', name)
 
-        log.debug('retry png: ' + ori_url)
-        full_path = os.path.join(FileSaveDirectory, utils.ValidFileName(title))
+        full_path = os.path.join(FileSaveDirectory, name)
         if utils.IsFileExists(full_path):
-            log.info('`HandleMangaImage` file [%s] existing, skip', ori_url)
+            log.info('file [%s] existing, skip', full_path)
             return True
 
-        if not SaveToFile(opener, ori_url, full_path):
-            # 以gif作为后缀重试
-            new_last2 = last1[0] + '_' + last1[1] + '.gif'
-            ori_url = ori_url.replace(new_last1, new_last2)
-            title = title.replace('.png', '.gif')
+        return SaveToFile(opener, url, full_path)
 
-            log.debug('retry gif: ' + ori_url)
-            full_path = os.path.join(FileSaveDirectory, utils.ValidFileName(title))
-            if utils.IsFileExists(full_path):
-                log.info('`HandleMangaImage` file [%s] existing, skip', ori_url)
-                return True
-
-            return SaveToFile(opener, ori_url, full_path)
-        else:
-            return True
-    else:
-        return True
-
-
-def HandleGif(opener, title, zip_url):
-    log.debug('HandleGif url %s', zip_url)
-
-    tmp = zip_url.split('/')[-1].split(".")[0]
-    name = tmp + title + '.zip'
-
-    full_path = os.path.join(FileSaveDirectory, utils.ValidFileName(name))
-    if utils.IsFileExists(full_path):
-        log.info('zip file [%s] existing, skip', zip_url)
-        return True
-
-    return SaveToFile(opener, zip_url, full_path)
+    except urllib.error.URLError as e:
+        PrintUrlErrorMsg(e)
+        return False
 
 
 ################################################################################
 
 
 def SaveSingleImage(opener, img):
-    slashPos = img.originalImgUrl.rfind('/')
-    dotPos = img.originalImgUrl.rfind('.')
-    title = img.originalImgUrl[slashPos+1:dotPos] # illustId_pX 部分
-    title += '_'
-    title += img.title
-    title += img.originalImgUrl[dotPos:len(img.originalImgUrl)]
-
+    assert(img.type == 'single' and img.pageCount == 1)
+    
+    url = img.jsonData['preload']['illust'][img.illustId]['urls']['original']
+    title = '%d_p0_%s%s' %(img.illustId, img.title, url[url.rfind('.'):])
     full_path = os.path.join(FileSaveDirectory, utils.ValidFileName(title))
     if utils.IsFileExists(full_path):
-        log.info('file [%s] existing, skip', img.originalImgUrl)
+        log.info('file [%s] existing, skip', url)
         return True
 
     try:
-        return SaveToFile(opener, img.originalImgUrl, full_path)
+        return SaveToFile(opener, url, full_path)
     except urllib.error.URLError as e:
         PrintUrlErrorMsg(e)
         return False
@@ -342,55 +330,21 @@ def SaveSingleImage(opener, img):
 
 
 def DetermineIllustPageType(img):
-    img.type = 'unknown'
+    type = img.jsonData['preload']['illust'][img.illustId]['illustType']
+    img.pageCount = img.jsonData['preload']['illust'][img.illustId]['pageCount']
 
-    js = re.findall('\(({token: ".*?})\);</script>', img.webContent, re.S)
-    if len(js) == 0:
-        log.debug('`DetermineIllustPageType` error main data not found')
-        return
-
-    # 去除干扰, 其他推荐的插画属性中也有 pageCount 字段
-    removePart = re.findall('"userIllusts":{.*?"likeData":false,', js[0], re.S)
-    if len(removePart) == 0:
-        log.warn('`DetermineIllustPageType` removePart not found')
-    for remove in removePart:
-        js[0] = js[0].replace(remove, '')
-
-    # 去除干扰, 延伸作品的插画属性中也有 illustType 字段
-    removePart = re.findall('"imageResponseData":\[.*?\]', js[0], re.S)
-    for remove in removePart:
-        js[0] = js[0].replace(remove, '')
-
-
-    pageCount = re.findall('"pageCount":([\d]+),', js[0], re.S)
-    illustType = re.findall('"illustType":([\d]+)', js[0], re.S)
-    if len(pageCount) != 1 or len(illustType) != 1:
-        log.warn("`DetermineIllustPageType` error 'pageCount' or 'illustType'")
-        return
-
-    illustId = re.findall('"illustId":"([\d]+)"', js[0], re.S)
-    if len(illustId) != 1:
-        log.warn('`DetermineIllustPageType` error illustId')
-        return
-
-    #img.illustId = int(illustId[0])
-
-    url = re.findall('"original":"(.*?)"', js[0])
-    if len(url) == 0:
-        log.warn('`DetermineIllustPageType` error original url')
-    img.originalImgUrl = url[0].replace('\\', '')
-
-    if int(illustType[0]) == 0 or int(illustType[0]) == 1:
-        if int(pageCount[0]) == 1:
-            img.pageCount = 1
+    if type == 0 or type == 1:
+        if img.pageCount == 1:
             img.type = 'single'
-        elif int(pageCount[0]) > 1:
-            img.pageCount = int(pageCount[0])
+        elif img.pageCount > 1:
             img.type = 'manga'
-    elif int(illustType[0]) == 2:
+    elif type == 2:
         img.type = 'gif'
+    else:
+        img.type = 'unknown'
+        log.error('unknown illust type %d', type)
 
-    log.debug('`DetermineIllustPageType` illustType=%d, pageCount=%d', int(illustType[0]), int(pageCount[0]))
+    log.debug('`DetermineIllustPageType` illustType=%d, pageCount=%d', type, img.pageCount)
     return
 
 
@@ -398,13 +352,12 @@ def DetermineIllustPageType(img):
 
 
 def DetermineIllustTags(img):
-    tags = re.findall('"tag":"(.*?)",', img.webContent, re.S)
+    tags = img.jsonData['preload']['illust'][img.illustId]['tags']['tags']
     img.tags = ''
     for t in tags:
-        # for tag like 'Fate/GO1000users入り'(r'Fate\/GO1000users\u5165\u308a')
-        # will result a "DeprecationWarning: invalid escape sequence '\/'"
-        # and remain it unchanged, so replace it first, if any
-        img.tags += ',' + t.replace('\\/', '/').encode().decode('unicode-escape')
+        img.tags += ',' + t['tag']
+
+    # remove first ','
     img.tags = img.tags[1:]
     log.debug('`DetermineIllustTags` find tags = %s', img.tags)
 
@@ -417,28 +370,19 @@ def ParsePage(opener, img):
     try:
         response = opener.open(img.webUrl)
         img.webContent = utils.Gzip(response.read())
-        
+
         tmp = re.findall("<script>.+globalInitData.+\(([{]token:.+[}])\);</script>", img.webContent, re.S)
         img.jsonStr = tmp[0]
         img.jsonData = demjson.decode(img.jsonStr)
 
-        tmp = re.findall("<title>.*?「(.*?)」.*?</title>", img.webContent, re.S)
-        img.title = tmp[0]
-
+        img.title = img.jsonData['preload']['illust'][img.illustId]['illustTitle']
         DetermineIllustPageType(img)
         DetermineIllustTags(img)
 
         if img.type == 'manga':
-            url = img.webUrl
-            return HandleManga(opener, img.title, url.replace("medium", "manga"))
+            return HandleManga(opener, img)
         elif img.type == 'gif':
-            zipUrl = img.originalImgUrl
-            zipUrl = zipUrl.replace('img-original', 'img-zip-ugoira')
-            lastPart = zipUrl[zipUrl.rfind('/')+1:len(zipUrl)]      # 提取最后文件id相关部分，如 65922304_ugoira0.jpg
-            newLastPart = lastPart[0:lastPart.find('_')+1]
-            newLastPart += 'ugoira1920x1080.zip'    # 1920x1080 代表原始gif, 600x600 代表缩小后的 gif, 所以固定用最大的即可
-            zipUrl = zipUrl.replace(lastPart, newLastPart)
-            return HandleGif(opener, img.title, zipUrl)
+            return HandleGif(opener, img)
         elif img.type == 'single':
             return SaveSingleImage(opener, img)
         else:
@@ -674,6 +618,7 @@ def ImportOldDataToDB():
 if __name__ == "__main__":
     try:
         log.InitLogger()
+        log.debug('************************** log start **************************')
 
         if len(sys.argv) > 1:
             if sys.argv[1] == '--import':
