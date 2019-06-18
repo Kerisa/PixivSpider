@@ -12,7 +12,7 @@
 ## 导入
 使用 `--import` 参数可导入原有记录文件 `PixivIdList.txt` 和 `PixivDownloadedImages.txt` 中的数据，导入前确认数据库中没有相应的记录以免冲突，最好直接导入到空的库中。至于 `PixivErrorPage.txt` 因为每次对未下载的文件都会重新尝试，所以这个记录就不需要导入了。
 ## 其他
-1 . python 需要安装 demjson 依赖
+1 . python 需要安装 demjson 依赖  
 2 . 在用户数据目录 `pixivspider-data` 下自动生成的文件<br>
 - `PixivCookie.txt`: 保存cookies<br>
 - `record.log`: 日志<br>
