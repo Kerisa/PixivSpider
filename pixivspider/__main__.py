@@ -479,7 +479,11 @@ def SetupSavingFolder(opener, author_id):
         html = utils.Gzip(response.read())
         creator = db.FindCreatorInfoViaID(author_id)
         if creator['name'] is None:
-            title = re.findall('<title>「(.*?)」.*?</title>', html, re.S)[0]
+            result = re.findall('<title>「(.*?)」.*?</title>', html, re.S)
+            if len(result) > 0:
+                title = result[0]
+            else:
+                title = re.findall('<title>(.*?)</title>', html, re.S)[0]
             db.UpdateCreatorName(author_id, title)
         else:
             title = creator['name']
