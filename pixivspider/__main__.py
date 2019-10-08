@@ -440,7 +440,7 @@ def GetAllIllustOfCreator(opener, author_id):
     log.debug("`GetAllIllustOfCreator` process Id: %s", author_id)
 
     page_url = "http://www.pixiv.net/member.php?id=%s" %(author_id)
-    illus_list_url = 'https://www.pixiv.net/touch/ajax/illust/user_illusts?user_id=%s' %(author_id)
+    illus_list_url = 'https://www.pixiv.net/ajax/user/%s/profile/all' %(author_id)
 
     values = {
         'Referer':page_url,
@@ -453,12 +453,18 @@ def GetAllIllustOfCreator(opener, author_id):
         response = opener.open(request)
 
         try:
+            img_id_str_list = []
             data = response.read()
-            img_id_str_list = json.loads(utils.Gzip(data))
+            json_data = json.loads(utils.Gzip(data))
+            log.debug('creator json: %s', json_data)
+            for i in json_data['body']['illusts']:
+                img_id_str_list.append(i)
+            for i in json_data['body']['manga']:
+                img_id_str_list.append(i)
+
         except IOError as e:
             log.info('creator %s illust is empty, maybe this ID is not valid any more', author_id)
             # img_id_str_list = json.loads(data)
-            img_id_str_list = []
 
         return img_id_str_list
 
