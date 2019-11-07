@@ -314,7 +314,7 @@ def HandleGif(opener, img):
 def SaveSingleImage(opener, img):
     assert(img.type == 'single' and img.pageCount == 1)
 
-    url = img.jsonData['preload']['illust'][img.illustId]['urls']['original']
+    url = img.jsonData['illust'][str(img.illustId)]['urls']['original']
     title = '%d_p0_%s%s' %(img.illustId, img.title, url[url.rfind('.'):])
     full_path = os.path.join(FileSaveDirectory, utils.ValidFileName(title))
     if utils.IsFileExists(full_path):
@@ -332,8 +332,8 @@ def SaveSingleImage(opener, img):
 
 
 def DetermineIllustPageType(img):
-    type = img.jsonData['preload']['illust'][img.illustId]['illustType']
-    img.pageCount = img.jsonData['preload']['illust'][img.illustId]['pageCount']
+    type = img.jsonData['illust'][str(img.illustId)]['illustType']
+    img.pageCount = img.jsonData['illust'][str(img.illustId)]['pageCount']
 
     if type == 0 or type == 1:
         if img.pageCount == 1:
@@ -354,7 +354,7 @@ def DetermineIllustPageType(img):
 
 
 def DetermineIllustTags(img):
-    tags = img.jsonData['preload']['illust'][img.illustId]['tags']['tags']
+    tags = img.jsonData['illust'][str(img.illustId)]['tags']['tags']
     img.tags = ''
     for t in tags:
         img.tags += ',' + t['tag']
@@ -373,11 +373,11 @@ def ParsePage(opener, img):
         response = opener.open(img.webUrl)
         img.webContent = utils.Gzip(response.read())
 
-        tmp = re.findall("<script>.+globalInitData.+\(([{]token:.+[}])\);</script>", img.webContent, re.S)
+        tmp = re.findall('<meta name="preload-data".+content=\'([{].+[}])\'>', img.webContent, re.S)
         img.jsonStr = tmp[0]
         img.jsonData = demjson.decode(img.jsonStr)
 
-        img.title = img.jsonData['preload']['illust'][img.illustId]['illustTitle']
+        img.title = img.jsonData['illust'][str(img.illustId)]['illustTitle']
         DetermineIllustPageType(img)
         DetermineIllustTags(img)
 
