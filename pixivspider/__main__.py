@@ -123,9 +123,11 @@ def IsLoggedIn(opener):
     res = opener.open(MainPage)
     status = re.findall('pixiv.user.loggedIn = ([\w]*);', utils.Gzip(res.read()), re.S)
     res.close()
-    assert len(status) > 0
-    b = re.search('true', status[0], re.IGNORECASE)
-    return bool(b)
+    if len(status) > 0:
+        b = re.search('true', status[0], re.IGNORECASE)
+        return bool(b)
+    else:
+        return True
 
 
 def UpdatePostKey(opener):
