@@ -41,6 +41,7 @@ LoginPage = "https://accounts.pixiv.net/login"
 LoginPage_Post = "https://accounts.pixiv.net/api/login?lang=zh"
 pixiv_url_login_post = "https://accounts.pixiv.net/api/login"
 
+USER_AGENT = 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Mobile Safari/537.36'
 
 # 在 GetIllustationListViaPixivId 中修改，用以控制保存文件路径
 FileSaveDirectory = ''
@@ -64,8 +65,7 @@ Header = {
     'Host': 'accounts.pixiv.net',
     'Referer': 'http://www.pixiv.net/',
     'Upgrade-Insecure-Requests': '1',
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) '
-                  'Chrome/73.0.3683.86 Safari/537.36'
+    'User-Agent': USER_AGENT
 }
 
 Proxy = urllib.request.ProxyHandler({'http': '127.0.0.1:8087'})
@@ -235,7 +235,7 @@ def HandleManga(opener, img):
 
     values = {
         'Referer':img.webUrl,
-        'User-Agent':'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Mobile Safari/537.36'
+        'User-Agent':USER_AGENT
     }
 
     try:
@@ -278,7 +278,7 @@ def HandleGif(opener, img):
 
     values = {
         'Referer':img.webUrl,
-        'User-Agent':'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Mobile Safari/537.36'
+        'User-Agent':USER_AGENT
     }
 
     try:
@@ -316,7 +316,7 @@ def HandleGif(opener, img):
 def SaveSingleImage(opener, img):
     assert(img.type == 'single' and img.pageCount == 1)
 
-    url = img.jsonData['illust'][str(img.illustId)]['urls']['original']
+    url = img.jsonData['urls']['original']
     title = '%d_p0_%s%s' %(img.illustId, img.title, url[url.rfind('.'):])
     full_path = os.path.join(FileSaveDirectory, utils.ValidFileName(title))
     if utils.IsFileExists(full_path):
@@ -334,8 +334,8 @@ def SaveSingleImage(opener, img):
 
 
 def DetermineIllustPageType(img):
-    type = img.jsonData['illust'][str(img.illustId)]['illustType']
-    img.pageCount = img.jsonData['illust'][str(img.illustId)]['pageCount']
+    type = img.jsonData['illustType']
+    img.pageCount = img.jsonData['pageCount']
 
     if type == 0 or type == 1:
         if img.pageCount == 1:
@@ -356,7 +356,7 @@ def DetermineIllustPageType(img):
 
 
 def DetermineIllustTags(img):
-    tags = img.jsonData['illust'][str(img.illustId)]['tags']['tags']
+    tags = img.jsonData['tags']['tags']
     img.tags = ''
     for t in tags:
         img.tags += ',' + t['tag']
@@ -369,17 +369,36 @@ def DetermineIllustTags(img):
 ################################################################################
 
 
+def TrimImageJsonBlob(jstr):
+    j = json.loads(jstr)['body']
+    if 'userIllusts' in j:
+        del j["userIllusts"]
+    if 'fanboxPromotion' in j:
+        del j["fanboxPromotion"]
+    if 'extraData' in j:
+        del j["extraData"]
+    if 'zoneConfig' in j:
+        del j["zoneConfig"]
+    if 'noLoginData' in j:
+        del j["noLoginData"]
+    return j
+
+
 def ParsePage(opener, img):
     log.debug('`ParsePage` open ' + img.webUrl)
     try:
-        response = opener.open(img.webUrl)
-        img.webContent = utils.Gzip(response.read())
+        values = {
+            'Referer': "https://www.pixiv.net/artworks/%d" %(img.illustId),
+            'User-Agent': USER_AGENT
+        }
+        request = urllib.request.Request(img.webUrl, headers=values)
+        response = opener.open(request)
+        img.jsonStr = utils.Gzip(response.read())
 
-        tmp = re.findall('<meta name="preload-data".+content=\'([{].+[}])\'>', img.webContent, re.S)
-        img.jsonStr = tmp[0]
-        img.jsonData = demjson.decode(img.jsonStr)
+        log.debug('`ParsePage` json = %s', img.jsonStr)
+        img.jsonData = TrimImageJsonBlob(img.jsonStr)
 
-        img.title = img.jsonData['illust'][str(img.illustId)]['illustTitle']
+        img.title = img.jsonData['illustTitle']
         DetermineIllustPageType(img)
         DetermineIllustTags(img)
 
@@ -391,6 +410,7 @@ def ParsePage(opener, img):
             return SaveSingleImage(opener, img)
         else:
             log.warn('parse page error - %s', img.webUrl)
+            return False
 
     except urllib.error.URLError as e:
         PrintUrlErrorMsg(e)
@@ -415,7 +435,7 @@ def ProcessCreator(opener, author_id, imgs):
         img = ImgInfo()
         img.illustId = img_id
         img.authorId = author_id
-        img.webUrl = 'https://www.pixiv.net/member_illust.php?mode=medium&illust_id=%d' %(img_id)
+        img.webUrl = 'https://www.pixiv.net/ajax/illust/%d' %(img_id)
         result = 0
 
         for retry in range(3):
@@ -441,12 +461,12 @@ def GetAllIllustOfCreator(opener, author_id):
     # 获取一位画师的所有插画
     log.debug("`GetAllIllustOfCreator` process Id: %s", author_id)
 
-    page_url = "http://www.pixiv.net/member.php?id=%s" %(author_id)
+    page_url = "http://www.pixiv.net/users/%s" %(author_id)
     illus_list_url = 'https://www.pixiv.net/ajax/user/%s/profile/all' %(author_id)
 
     values = {
         'Referer':page_url,
-        'User-Agent':'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Mobile Safari/537.36'
+        'User-Agent':USER_AGENT
     }
 
     try:
@@ -481,7 +501,7 @@ def GetAllIllustOfCreator(opener, author_id):
 def SetupSavingFolder(opener, author_id):
     # 创建储存插画的文件夹，并保存至全局变量 FileSaveDirectory
     log.debug("`SetupSavingFolder` process Id: %s", author_id)
-    page_url = "http://www.pixiv.net/member.php?id=%s" %(author_id)
+    page_url = "http://www.pixiv.net/users/%s" %(author_id)
     try:
         response = opener.open(page_url)
         html = utils.Gzip(response.read())
@@ -545,6 +565,11 @@ def NormalDownload():
             imgs = GetAllIllustOfCreator(opener, id)
             if SetupSavingFolder(opener, id):
                 ProcessCreator(opener, id, imgs)
+                try:
+                    os.rmdir(FileSaveDirectory)
+                    log.info('empty folder %s removed', FileSaveDirectory)
+                except OSError:
+                    pass
 
     log.info('download finish.')
 
