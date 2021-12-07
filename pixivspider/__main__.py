@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import urllib.request, urllib.parse, urllib.error
-import urllib.request, urllib.error, urllib.parse
 import http.cookiejar
 import re
 import queue
@@ -13,8 +12,6 @@ import sys
 import io
 import json
 import platform
-
-import demjson
 
 import log
 import db
@@ -121,11 +118,11 @@ def GetOpenerFromCookie(header):
 
 def IsLoggedIn(opener):
     res = opener.open(MainPage)
-    status = re.findall('pixiv.user.loggedIn = ([\w]*);', utils.Gzip(res.read()), re.S)
+    tmp = utils.Gzip(res.read())
+    status = re.findall('login\.php', tmp, re.S)
     res.close()
     if len(status) > 0:
-        b = re.search('true', status[0], re.IGNORECASE)
-        return bool(b)
+        return False
     else:
         return True
 
@@ -538,15 +535,16 @@ def CreateOpener():
     opener = GetOpenerFromCookie(Header)
     if not IsLoggedIn(opener):
         log.info('cookie file not found or invalid, loggin...')
-        opener = Login()
-        global GlobalCookie
-        GlobalCookie.save()
+        log.warn('automatically login is invalid due to reCAPTCHA, please login manually and update PixivCookie.txt file')
+        # opener = Login()
+        # global GlobalCookie
+        # GlobalCookie.save()
 
     if IsLoggedIn(opener):
         log.info('login Succeess.')
         return opener
     else:
-        log.info('login Error.')
+        log.error('login Error.')
         return None
 
 
