@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import urllib.request, urllib.parse, urllib.error
+import requests
 import http.cookiejar
 import re
 import queue
@@ -12,6 +13,7 @@ import sys
 import io
 import json
 import platform
+from datetime import datetime, timedelta
 
 import log
 import db
@@ -31,6 +33,7 @@ class ImgInfo:
         self.type=''
         self.jsonStr=''
         self.jsonData=''
+        self.save_dir=''
 
 
 MainPage = "http://www.pixiv.net/"
@@ -119,7 +122,7 @@ def GetOpenerFromCookie(header):
 def IsLoggedIn(opener):
     res = opener.open(MainPage)
     tmp = utils.Gzip(res.read())
-    status = re.findall('''login.php''', tmp, re.S)
+    status = re.findall(r'login.php', tmp, re.S)
     res.close()
     if len(status) > 0:
         return False
@@ -230,7 +233,7 @@ def HandleManga(opener, img):
             name = '%d_p%d_%s%s' %(img.illustId, index, utils.ValidFileName(img.title), url[url.rfind('.'):])
             log.debug('generate file name: %s', name)
             index = index + 1
-            full_path = os.path.join(FileSaveDirectory, name)
+            full_path = os.path.join(img.save_dir, name)
             if utils.IsFileExists(full_path):
                 log.info('file [%s] existing, skip', full_path)
                 continue
@@ -271,7 +274,7 @@ def HandleGif(opener, img):
         name = '%s_%s%s' %(url[url.rfind('/')+1:url.rfind('.')], utils.ValidFileName(img.title), url[url.rfind('.'):])
         log.debug('generate file name: %s', name)
 
-        full_path = os.path.join(FileSaveDirectory, name)
+        full_path = os.path.join(img.save_dir, name)
         if utils.IsFileExists(full_path):
             log.info('file [%s] existing, skip', full_path)
             return True
@@ -291,7 +294,7 @@ def SaveSingleImage(opener, img):
 
     url = img.jsonData['urls']['original']
     title = '%d_p0_%s%s' %(img.illustId, img.title, url[url.rfind('.'):])
-    full_path = os.path.join(FileSaveDirectory, utils.ValidFileName(title))
+    full_path = os.path.join(img.save_dir, utils.ValidFileName(title))
     if utils.IsFileExists(full_path):
         log.info('file [%s] existing, skip', url)
         return True
@@ -409,6 +412,7 @@ def ProcessCreator(opener, author_id, imgs):
         img.illustId = img_id
         img.authorId = author_id
         img.webUrl = 'https://www.pixiv.net/ajax/illust/%d' %(img_id)
+        img.save_dir = FileSaveDirectory
         result = 0
 
         for retry in range(3):
@@ -638,6 +642,22 @@ def AddOneCreator(creatorID):
 
 ################################################################################
 
+def DownloadDailyRankedFirst(save_dir):
+    url = r'https://www.pixiv.net/ranking.php?mode=daily&date=' + (datetime.today() - timedelta(days=1)).strftime('%Y%m%d') + '&p=1&format=json'
+    opener = CreateOpener()
+    r = requests.get(url)
+    jstr = r.json()
+    id = jstr['contents'][0]['illust_id']
+    log.info('fetch: ' + url + ', illust id: ' + id)
+    img = ImgInfo()
+    img.illustId = int(id)
+    img.authorId = 0
+    img.webUrl = 'https://www.pixiv.net/ajax/illust/%d' %(id)
+    img.save_dir = save_dir
+    ParsePage(opener, img)
+
+################################################################################
+
 
 if __name__ == "__main__":
     try:
@@ -649,6 +669,8 @@ if __name__ == "__main__":
                 ImportOldDataToDB()
             elif sys.argv[1] == '--add-creator':
                 AddOneCreator(sys.argv[2])
+            elif sys.argv[1] == '--dl-day-rank-1st':
+                DownloadDailyRankedFirst(sys.argv[2])
             else:
                 log.info('unknown argument: ' + ' '.join(sys.argv))
         else:
