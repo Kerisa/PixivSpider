@@ -119,7 +119,7 @@ def GetOpenerFromCookie(header):
 def IsLoggedIn(opener):
     res = opener.open(MainPage)
     tmp = utils.Gzip(res.read())
-    status = re.findall('login\.php', tmp, re.S)
+    status = re.findall('''login.php''', tmp, re.S)
     res.close()
     if len(status) > 0:
         return False
@@ -137,30 +137,6 @@ def UpdatePostKey(opener):
         return ''
     else:
         return post_key[0]
-
-
-def Login():
-    opener = GenerateOpener(Header)
-    pixiv_key = UpdatePostKey(opener)
-
-    post_data = {
-        'pixiv_id': conf.GetAccountName(),
-        'password': conf.GetAccountPwd(),
-        'post_key': pixiv_key,
-        'source': 'accounts'
-    }
-    post_data = urllib.parse.urlencode(post_data).encode('utf-8')
-
-    try:
-        op_login = opener.open(pixiv_url_login_post, post_data)
-        op_login.close()
-    except urllib.error.URLError as e:
-        PrintUrlErrorMsg(e)
-    except:
-        log.exception('others error occurred while loggin.')
-    else:
-        return opener
-
 
 ################################################################################
 
@@ -536,9 +512,6 @@ def CreateOpener():
     if not IsLoggedIn(opener):
         log.info('cookie file not found or invalid, loggin...')
         log.warn('automatically login is invalid due to reCAPTCHA, please login manually and update PixivCookie.txt file')
-        # opener = Login()
-        # global GlobalCookie
-        # GlobalCookie.save()
 
     if IsLoggedIn(opener):
         log.info('login Succeess.')
@@ -651,6 +624,20 @@ def ImportOldDataToDB():
 
 ################################################################################
 
+def AddOneCreator(creatorID):
+    if db.FindCreatorInfoViaID(int(creatorID)):
+        log.info('creator ' + creatorID + ' already exists, skip')
+        return
+    s = set()
+    s.add(int(creatorID))
+    db.AddCreatorID(s)
+    if db.FindCreatorInfoViaID(int(creatorID)):
+        log.info('creator ' + creatorID + ' added')
+    else:
+        log.error('add creator ' + creatorID + ' FAILED')
+
+################################################################################
+
 
 if __name__ == "__main__":
     try:
@@ -660,6 +647,8 @@ if __name__ == "__main__":
         if len(sys.argv) > 1:
             if sys.argv[1] == '--import':
                 ImportOldDataToDB()
+            elif sys.argv[1] == '--add-creator':
+                AddOneCreator(sys.argv[2])
             else:
                 log.info('unknown argument: ' + ' '.join(sys.argv))
         else:
