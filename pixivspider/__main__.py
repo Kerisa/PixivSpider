@@ -648,7 +648,7 @@ def DownloadDailyRankedFirst(save_dir):
     r = requests.get(url)
     jstr = r.json()
     id = jstr['contents'][0]['illust_id']
-    log.info('fetch: ' + url + ', illust id: ' + id)
+    log.info('fetch: ' + url + ', illust id: ' + str(id))
     img = ImgInfo()
     img.illustId = int(id)
     img.authorId = 0
