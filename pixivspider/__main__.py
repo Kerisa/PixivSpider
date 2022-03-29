@@ -643,7 +643,7 @@ def AddOneCreator(creatorID):
 ################################################################################
 
 def DownloadDailyRankedFirst(save_dir):
-    url = r'https://www.pixiv.net/ranking.php?mode=daily&date=' + (datetime.today() - timedelta(days=1)).strftime('%Y%m%d') + '&p=1&format=json'
+    url = r'https://www.pixiv.net/ranking.php?mode=daily&content=illust&date=' + (datetime.today() - timedelta(days=2)).strftime('%Y%m%d') + '&p=1&format=json'
     opener = CreateOpener()
     r = requests.get(url)
     jstr = r.json()
