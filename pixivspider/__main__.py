@@ -647,7 +647,12 @@ def DownloadDailyRankedFirst(save_dir):
     opener = CreateOpener()
     r = requests.get(url)
     jstr = r.json()
-    id = jstr['contents'][0]['illust_id']
+    rank = 0
+    while rank < 20 and int(jstr['contents'][rank]['illust_page_count']) > 1:
+        rank = rank + 1
+    if rank >= 20:
+        rank = 0
+    id = jstr['contents'][rank]['illust_id']
     log.info('fetch: ' + url + ', illust id: ' + str(id))
     img = ImgInfo()
     img.illustId = int(id)
