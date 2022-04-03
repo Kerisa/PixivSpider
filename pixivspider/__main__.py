@@ -478,23 +478,25 @@ def GetAllIllustOfCreator(opener, author_id):
 def SetupSavingFolder(opener, author_id):
     # 创建储存插画的文件夹，并保存至全局变量 FileSaveDirectory
     log.debug("`SetupSavingFolder` process Id: %s", author_id)
-    page_url = "http://www.pixiv.net/users/%s" %(author_id)
+    page_url = "https://www.pixiv.net/user/%s" %(author_id)
+    page_ajax_url = "https://www.pixiv.net/ajax/user/%s" %(author_id)
+    values = {
+        'Referer':page_url,
+        'User-Agent':USER_AGENT
+    }
     try:
-        response = opener.open(page_url)
-        html = utils.Gzip(response.read())
+        request = urllib.request.Request(page_ajax_url, headers=values)
+        response = opener.open(request)
+        data = response.read()
+        json_data = json.loads(utils.Gzip(data))
+        new_name = json_data['body']['name']
         creator = db.FindCreatorInfoViaID(author_id)
-        if creator['name'] is None:
-            result = re.findall('<title>「(.*?)」.*?</title>', html, re.S)
-            if len(result) > 0:
-                title = result[0]
-            else:
-                title = re.findall('<title>(.*?)</title>', html, re.S)[0]
-            db.UpdateCreatorName(author_id, title)
-        else:
-            title = creator['name']
+        if creator['name'] is None or creator['name'] != new_name:
+            db.UpdateCreatorName(author_id, new_name)
+            log.info("`SetupSavingFolder` update creator %s name to %s", author_id, new_name)
 
         global FileSaveDirectory
-        FileSaveDirectory = os.path.join(conf.GetDownloadsDir(), utils.ValidFileName(title) + ' ' + str(author_id))
+        FileSaveDirectory = os.path.join(conf.GetDownloadsDir(), utils.ValidFileName(new_name) + ' ' + str(author_id))
 
         if not os.path.exists(FileSaveDirectory):
             os.makedirs(FileSaveDirectory)
