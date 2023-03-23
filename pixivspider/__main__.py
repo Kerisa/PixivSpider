@@ -644,6 +644,18 @@ def AddOneCreator(creatorID):
 
 ################################################################################
 
+def DelOneCreator(creatorID):
+    if not db.FindCreatorInfoViaID(int(creatorID)):
+        log.info('creator ' + creatorID + ' not exists, skip')
+        return
+    db.DeleteCreateID(int(creatorID))
+    if not db.FindCreatorInfoViaID(int(creatorID)):
+        log.info('creator ' + creatorID + ' deleted')
+    else:
+        log.error('delete creator ' + creatorID + ' FAILED')
+
+################################################################################
+
 def DownloadDailyRankedFirst(save_dir):
     url = r'https://www.pixiv.net/ranking.php?mode=daily&content=illust&date=' + (datetime.today() - timedelta(days=2)).strftime('%Y%m%d') + '&p=1&format=json'
     opener = CreateOpener()
@@ -676,6 +688,8 @@ if __name__ == "__main__":
                 ImportOldDataToDB()
             elif sys.argv[1] == '--add-creator':
                 AddOneCreator(sys.argv[2])
+            elif sys.argv[1] == '--del-creator':
+                DelOneCreator(sys.argv[2])
             elif sys.argv[1] == '--dl-day-rank-1st':
                 DownloadDailyRankedFirst(sys.argv[2])
             else:

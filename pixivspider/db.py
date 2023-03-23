@@ -58,6 +58,12 @@ def AddCreatorID(list):
     db.executemany(sql, data)
     db.commit()
 
+def DeleteCreateID(id):
+    db = GetDB()
+    db.execute('DELETE FROM creator WHERE id = ?', (id,))
+    db.commit()
+    log.debug('db.DeleteCreateID %d', id)
+
 
 def FindCreatorInfoViaID(id):
     creator = GetDB().execute(
