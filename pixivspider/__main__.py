@@ -630,29 +630,57 @@ def ImportOldDataToDB():
 
 ################################################################################
 
+def ParseCreatorID(creatorID):
+    creatorID = str(creatorID).strip()
+    if not creatorID.isdigit():
+        log.error('invalid creator ID `%s`, it should be a positive integer', creatorID)
+        return 0
+    return int(creatorID)
+
+################################################################################
+
 def AddOneCreator(creatorID):
-    if db.FindCreatorInfoViaID(int(creatorID)):
-        log.info('creator ' + creatorID + ' already exists, skip')
+    id = ParseCreatorID(creatorID)
+    if id <= 0:
+        return
+    if db.FindCreatorInfoViaID(id):
+        log.info('creator ' + str(id) + ' already exists, skip')
         return
     s = set()
-    s.add(int(creatorID))
+    s.add(id)
     db.AddCreatorID(s)
-    if db.FindCreatorInfoViaID(int(creatorID)):
-        log.info('creator ' + creatorID + ' added')
+    if db.FindCreatorInfoViaID(id):
+        log.info('creator ' + str(id) + ' added')
     else:
-        log.error('add creator ' + creatorID + ' FAILED')
+        log.error('add creator ' + str(id) + ' FAILED')
 
 ################################################################################
 
 def DelOneCreator(creatorID):
-    if not db.FindCreatorInfoViaID(int(creatorID)):
-        log.info('creator ' + creatorID + ' not exists, skip')
+    id = ParseCreatorID(creatorID)
+    if id <= 0:
         return
-    db.DeleteCreateID(int(creatorID))
-    if not db.FindCreatorInfoViaID(int(creatorID)):
-        log.info('creator ' + creatorID + ' deleted')
+    if not db.FindCreatorInfoViaID(id):
+        log.info('creator ' + str(id) + ' not exists, skip')
+        return
+    # 已下载插画的记录保留，重新添加该画师时不会重复下载
+    illustCount = db.CountIllustOfAuthor(id)
+    db.DeleteFailedIllustRecordViaAuthorID(id)
+    db.DeleteCreatorID(id)
+    if not db.FindCreatorInfoViaID(id):
+        log.info('creator ' + str(id) + ' deleted, %d downloaded illust record(s) kept in db', illustCount)
     else:
-        log.error('delete creator ' + creatorID + ' FAILED')
+        log.error('delete creator ' + str(id) + ' FAILED')
+
+################################################################################
+
+def PrintCreatorCmdUsage(cmd):
+    log.info('usage: python pixivspider ' + cmd + ' <creator_id> [creator_id ...]')
+    creators = db.GetAllCreatorID()
+    if len(creators) == 0:
+        log.info('no creator in db')
+    else:
+        log.info('%d creator(s) in db: %s', len(creators), ', '.join([str(i) for i in creators]))
 
 ################################################################################
 
@@ -687,9 +715,17 @@ if __name__ == "__main__":
             if sys.argv[1] == '--import':
                 ImportOldDataToDB()
             elif sys.argv[1] == '--add-creator':
-                AddOneCreator(sys.argv[2])
+                if len(sys.argv) < 3:
+                    PrintCreatorCmdUsage(sys.argv[1])
+                else:
+                    for creatorID in sys.argv[2:]:
+                        AddOneCreator(creatorID)
             elif sys.argv[1] == '--del-creator':
-                DelOneCreator(sys.argv[2])
+                if len(sys.argv) < 3:
+                    PrintCreatorCmdUsage(sys.argv[1])
+                else:
+                    for creatorID in sys.argv[2:]:
+                        DelOneCreator(creatorID)
             elif sys.argv[1] == '--dl-day-rank-1st':
                 DownloadDailyRankedFirst(sys.argv[2])
             else:

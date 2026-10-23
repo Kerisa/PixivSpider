@@ -58,11 +58,26 @@ def AddCreatorID(list):
     db.executemany(sql, data)
     db.commit()
 
-def DeleteCreateID(id):
+def DeleteCreatorID(id):
     db = GetDB()
     db.execute('DELETE FROM creator WHERE id = ?', (id,))
     db.commit()
-    log.debug('db.DeleteCreateID %d', id)
+    log.debug('db.DeleteCreatorID %d', id)
+
+
+def CountIllustOfAuthor(authorId):
+    rec = GetDB().execute(
+        'SELECT COUNT(id) AS count FROM illust WHERE author_id = ?',
+        (authorId,)
+    ).fetchone()
+    return rec['count']
+
+
+def DeleteFailedIllustRecordViaAuthorID(authorId):
+    db = GetDB()
+    c = db.execute('DELETE FROM download_failed WHERE author_id = ?', (authorId,))
+    db.commit()
+    log.debug('db.DeleteFailedIllustRecordViaAuthorID %d, %d record(s)', authorId, c.rowcount)
 
 
 def FindCreatorInfoViaID(id):
